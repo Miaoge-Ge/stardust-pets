@@ -3,7 +3,8 @@
  * 用分层椭圆/贝塞尔路径构建(专业扁平插画常用技法),而非像素格拼接,
  * 边缘天然平滑抗锯齿,配色全部走 CSS 变量,换色零成本。
  */
-import type { RigAnim, SpeciesRig } from '../rig';
+import type { SpeciesRig } from '../rig';
+import { SHARED_ANIMS } from './sharedAnims';
 
 export const CAT_RIG: SpeciesRig = {
   svg: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
@@ -58,92 +59,7 @@ export const CAT_RIG: SpeciesRig = {
     eyeL: [43, 37],
     eyeR: [57, 37],
   },
-  animations: {
-    groom: {
-      loop: true,
-      durationMs: 2600,
-      keyframes: [
-        { t: 0, parts: { head: { rotate: 0 }, earL: { rotate: 0 } } },
-        { t: 0.5, parts: { head: { rotate: -8, ty: 2 }, earL: { rotate: -6 } } },
-        { t: 1, parts: { head: { rotate: 0 }, earL: { rotate: 0 } } },
-      ],
-    },
-  },
+  animations: {},
 };
 
-/** 共享通用动作(所有物种复用同一套关键帧,针对各自 part 名生效即可) */
-export const SHARED_ANIMS: Record<string, RigAnim> = {
-  sit: {
-    loop: true,
-    durationMs: 2400,
-    keyframes: [
-      { t: 0, parts: { body: { scaleY: 1 }, tailBase: { rotate: -4 } } },
-      { t: 0.5, parts: { body: { scaleY: 1.02 }, tailBase: { rotate: 6 } } },
-      { t: 1, parts: { body: { scaleY: 1 }, tailBase: { rotate: -4 } } },
-    ],
-  },
-  daze: {
-    loop: true,
-    durationMs: 3000,
-    keyframes: [
-      { t: 0, parts: { head: { rotate: -3 } } },
-      { t: 0.5, parts: { head: { rotate: 3 } } },
-      { t: 1, parts: { head: { rotate: -3 } } },
-    ],
-  },
-  sleep: {
-    loop: true,
-    durationMs: 2800,
-    keyframes: [
-      { t: 0, parts: { body: { scaleY: 1, scaleX: 1 } } },
-      { t: 0.5, parts: { body: { scaleY: 1.04, scaleX: 0.98 } } },
-      { t: 1, parts: { body: { scaleY: 1, scaleX: 1 } } },
-    ],
-  },
-  click_happy: {
-    loop: false,
-    durationMs: 700,
-    keyframes: [
-      { t: 0, parts: { body: { ty: 0 }, earL: { rotate: 0 }, earR: { rotate: 0 } } },
-      { t: 0.3, parts: { body: { ty: -10, scaleY: 1.08 }, earL: { rotate: -10 }, earR: { rotate: 10 } } },
-      { t: 1, parts: { body: { ty: 0 }, earL: { rotate: 0 }, earR: { rotate: 0 } } },
-    ],
-  },
-  petted: {
-    loop: false,
-    durationMs: 1300,
-    keyframes: [
-      { t: 0, parts: { head: { rotate: 0, ty: 0 } } },
-      { t: 0.5, parts: { head: { rotate: -6, ty: 3 } } },
-      { t: 1, parts: { head: { rotate: 0, ty: 0 } } },
-    ],
-  },
-  sulk: {
-    loop: true,
-    durationMs: 2000,
-    keyframes: [
-      { t: 0, parts: { tailBase: { rotate: 0 } } },
-      { t: 0.5, parts: { tailBase: { rotate: -12 } } },
-      { t: 1, parts: { tailBase: { rotate: 0 } } },
-    ],
-  },
-  walk: {
-    loop: true,
-    durationMs: 900,
-    keyframes: [
-      { t: 0, parts: { body: { ty: 0 }, head: { ty: 0 } } },
-      { t: 0.25, parts: { body: { ty: -2 }, head: { ty: -1 } } },
-      { t: 0.5, parts: { body: { ty: 0 }, head: { ty: 0 } } },
-      { t: 0.75, parts: { body: { ty: -2 }, head: { ty: -1 } } },
-      { t: 1, parts: { body: { ty: 0 }, head: { ty: 0 } } },
-    ],
-  },
-  wake_startled: {
-    loop: false,
-    durationMs: 700,
-    keyframes: [
-      { t: 0, parts: { earL: { rotate: 15 }, earR: { rotate: -15 }, body: { scaleY: 0.9 } } },
-      { t: 1, parts: { earL: { rotate: 0 }, earR: { rotate: 0 }, body: { scaleY: 1 } } },
-    ],
-  },
-};
+export { SHARED_ANIMS };
