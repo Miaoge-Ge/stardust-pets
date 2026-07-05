@@ -8,6 +8,7 @@ import {
   DIMENSIONS,
   PITY_SR,
   PITY_SSR,
+  PITY_UR,
   SERIES,
   WISH_COST,
   type Rarity,
@@ -35,8 +36,11 @@ const DIM_NAMES: Record<string, string> = {
 };
 
 const SPECIES_NAMES: Record<string, string> = {
-  sp_cat: '猫', sp_dog: '狗', sp_rabbit: '兔', sp_fox: '狐狸',
-  sp_hamster: '仓鼠', sp_bird: '小鸟', sp_slime: '史莱姆', sp_dragon: '幼龙',
+  sp_cat: '猫', sp_dog: '狗', sp_rabbit: '兔', sp_fox: '狐狸', sp_hamster: '仓鼠',
+  sp_bird: '小鸟', sp_duck: '小鸭', sp_hedgehog: '刺猬', sp_panda: '熊猫',
+  sp_penguin: '企鹅', sp_turtle: '乌龟', sp_owl: '猫头鹰', sp_deer: '小鹿',
+  sp_slime: '史莱姆', sp_octopus: '小章鱼', sp_bat: '蝙蝠', sp_dragon: '幼龙',
+  sp_ghost: '小幽灵', sp_unicorn: '独角兽', sp_phoenix: '凤凰雏',
 };
 
 // ---------------------------------------------------------------- 通用
@@ -112,8 +116,10 @@ async function renderPity(): Promise<void> {
   const st = await getGachaState();
   $('#pitySrText').textContent = `距保底还剩 ${PITY_SR - st.sr} 抽`;
   $('#pitySsrText').textContent = `距保底还剩 ${PITY_SSR - st.ssr} 抽`;
+  $('#pityUrText').textContent = `距保底还剩 ${PITY_UR - st.ur} 抽`;
   ($('#pitySrFill') as HTMLElement).style.width = `${(st.sr / PITY_SR) * 100}%`;
   ($('#pitySsrFill') as HTMLElement).style.width = `${(st.ssr / PITY_SSR) * 100}%`;
+  ($('#pityUrFill') as HTMLElement).style.width = `${(st.ur / PITY_UR) * 100}%`;
 }
 
 async function renderHistory(): Promise<void> {
@@ -176,7 +182,8 @@ async function playEggAnim(topRarity: Rarity): Promise<void> {
   egg.className = `egg ${topRarity}`;
   overlay.classList.remove('hidden');
   skipAnim = false;
-  const waitMs = topRarity === 'SSR' ? 2200 : topRarity === 'SR' ? 1700 : 1200;
+  const waitMs =
+    topRarity === 'UR' ? 3000 : topRarity === 'SSR' ? 2200 : topRarity === 'SR' ? 1700 : 1200;
   await new Promise<void>((resolve) => {
     const t = setTimeout(resolve, waitMs);
     const onClick = (): void => {
@@ -199,7 +206,7 @@ async function doPull(count: 1 | 10): Promise<void> {
       alert('星星币不足!挂机、签到、完成每日任务可以获得星星币。');
       return;
     }
-    const order: Rarity[] = ['N', 'R', 'SR', 'SSR'];
+    const order: Rarity[] = ['N', 'R', 'SR', 'SSR', 'UR'];
     const top = results.reduce<Rarity>(
       (acc, r) => (order.indexOf(r.gen.rarity) > order.indexOf(acc) ? r.gen.rarity : acc),
       'N'
@@ -241,10 +248,10 @@ async function renderCodex(): Promise<void> {
 async function renderMyPets(): Promise<void> {
   const pets = await listPets();
   const activeId = await getSetting('active_pet_id');
-  const byRar: Record<string, number> = { N: 0, R: 0, SR: 0, SSR: 0 };
+  const byRar: Record<string, number> = { N: 0, R: 0, SR: 0, SSR: 0, UR: 0 };
   for (const p of pets) byRar[p.rarity] = (byRar[p.rarity] ?? 0) + 1;
   $('#petsProgress').textContent =
-    `共 ${pets.length} 只 · N ${byRar.N} / R ${byRar.R} / SR ${byRar.SR} / SSR ${byRar.SSR}`;
+    `共 ${pets.length} 只 · N ${byRar.N} / R ${byRar.R} / SR ${byRar.SR} / SSR ${byRar.SSR} / UR ${byRar.UR}`;
   const grid = $('#petsGrid');
   grid.innerHTML = '';
   for (const p of pets) {
@@ -347,7 +354,7 @@ async function renderPartsCodex(): Promise<void> {
   const unlocked = await unlockedPartIds();
   const allCollectibles = [...ALL_PARTS, ...ALL_EFFECTS.map((e) => ({ ...e, dimension: 'effect' }))];
   const byRar: Record<string, [number, number]> = {
-    N: [0, 0], R: [0, 0], SR: [0, 0], SSR: [0, 0],
+    N: [0, 0], R: [0, 0], SR: [0, 0], SSR: [0, 0], UR: [0, 0],
   };
   for (const p of allCollectibles) {
     byRar[p.minRarity][1]++;
@@ -358,7 +365,8 @@ async function renderPartsCodex(): Promise<void> {
   $('#partsProgress').textContent =
     `收集进度 ${got}/${total}(${Math.round((got / total) * 100)}%) · ` +
     `N ${byRar.N[0]}/${byRar.N[1]} · R ${byRar.R[0]}/${byRar.R[1]} · ` +
-    `SR ${byRar.SR[0]}/${byRar.SR[1]} · SSR ${byRar.SSR[0]}/${byRar.SSR[1]}`;
+    `SR ${byRar.SR[0]}/${byRar.SR[1]} · SSR ${byRar.SSR[0]}/${byRar.SSR[1]} · ` +
+    `UR ${byRar.UR[0]}/${byRar.UR[1]}`;
 
   const blocks = $('#partsBlocks');
   blocks.innerHTML = '';
@@ -446,7 +454,7 @@ function fillWishSpecies(): void {
   const rarity = ($('#wishRarity') as HTMLSelectElement).value as Rarity;
   const sel = $('#wishSpecies') as HTMLSelectElement;
   sel.innerHTML = '';
-  const order = { N: 0, R: 1, SR: 2, SSR: 3 };
+  const order = { N: 0, R: 1, SR: 2, SSR: 3, UR: 4 };
   for (const p of ALL_PARTS.filter((x) => x.dimension === 'species')) {
     if (order[p.minRarity] > order[rarity]) continue;
     const opt = document.createElement('option');

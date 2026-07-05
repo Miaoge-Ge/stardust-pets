@@ -121,7 +121,8 @@ function feetPhys(): number {
 
 function reportHitbox(): void {
   const full = overlayActive || dragging;
-  void invoke('update_hitbox', { x: 54, y: 132, w: 152, h: 156, full });
+  // 宠物缩小到 88px 后的包围盒(含少量余量)
+  void invoke('update_hitbox', { x: 78, y: 184, w: 104, h: 102, full });
 }
 
 // ---------------------------------------------------------------- FSM Host

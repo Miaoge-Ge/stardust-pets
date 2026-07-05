@@ -8,13 +8,20 @@ import partsCfg from '../config/parts.json';
 import { hslToHex, shade } from './colors';
 import { mulberry32, pickRng, type Rng } from './prng';
 
-export type Rarity = 'N' | 'R' | 'SR' | 'SSR';
-export const RARITIES: Rarity[] = ['N', 'R', 'SR', 'SSR'];
-export const RATES: Record<Rarity, number> = { N: 0.65, R: 0.25, SR: 0.085, SSR: 0.015 };
+export type Rarity = 'N' | 'R' | 'SR' | 'SSR' | 'UR';
+export const RARITIES: Rarity[] = ['N', 'R', 'SR', 'SSR', 'UR'];
+export const RATES: Record<Rarity, number> = {
+  N: 0.58,
+  R: 0.27,
+  SR: 0.1,
+  SSR: 0.042,
+  UR: 0.008,
+};
 export const PITY_SR = 50;
 export const PITY_SSR = 100;
+export const PITY_UR = 200;
 
-const ORDER: Record<Rarity, number> = { N: 0, R: 1, SR: 2, SSR: 3 };
+const ORDER: Record<Rarity, number> = { N: 0, R: 1, SR: 2, SSR: 3, UR: 4 };
 
 export interface PartDef {
   id: string;
@@ -67,6 +74,7 @@ export function partById(id: string): PartDef | undefined {
 export interface PityState {
   sr: number;
   ssr: number;
+  ur: number;
 }
 
 export interface RarityRoll {
@@ -75,26 +83,31 @@ export interface RarityRoll {
 }
 
 /**
- * 保底规则:
+ * 三重保底:
+ *  - 本抽计入后 ur 计数达到 200 → 必得 UR
  *  - 本抽计入后 ssr 计数达到 100 → 必得 SSR
  *  - 本抽计入后 sr 计数达到 50 且掷出低于 SR → 强制 SR
- *  - SR 计数在出 SR/SSR 时重置;SSR 计数仅在出 SSR 时重置
+ *  - SR 计数在出 ≥SR 时重置;SSR 计数在出 ≥SSR 时重置;UR 计数仅在出 UR 时重置
  */
 export function rollRarity(rng: Rng, pity: PityState): RarityRoll {
   let rarity: Rarity;
-  if (pity.ssr + 1 >= PITY_SSR) {
+  if (pity.ur + 1 >= PITY_UR) {
+    rarity = 'UR';
+  } else if (pity.ssr + 1 >= PITY_SSR) {
     rarity = 'SSR';
   } else {
     const r = rng();
-    if (r < RATES.SSR) rarity = 'SSR';
-    else if (r < RATES.SSR + RATES.SR) rarity = 'SR';
-    else if (r < RATES.SSR + RATES.SR + RATES.R) rarity = 'R';
+    if (r < RATES.UR) rarity = 'UR';
+    else if (r < RATES.UR + RATES.SSR) rarity = 'SSR';
+    else if (r < RATES.UR + RATES.SSR + RATES.SR) rarity = 'SR';
+    else if (r < RATES.UR + RATES.SSR + RATES.SR + RATES.R) rarity = 'R';
     else rarity = 'N';
     if (pity.sr + 1 >= PITY_SR && ORDER[rarity] < ORDER.SR) rarity = 'SR';
   }
   const next: PityState = {
     sr: ORDER[rarity] >= ORDER.SR ? 0 : pity.sr + 1,
-    ssr: rarity === 'SSR' ? 0 : pity.ssr + 1,
+    ssr: ORDER[rarity] >= ORDER.SSR ? 0 : pity.ssr + 1,
+    ur: rarity === 'UR' ? 0 : pity.ur + 1,
   };
   return { rarity, pity: next };
 }
@@ -223,9 +236,10 @@ export function generatePet(rarity: Rarity, seed: number): GeneratedPet {
   }
 
   const effects: string[] = [];
-  if (rarity === 'SR' || rarity === 'SSR') {
+  const effectCount: Partial<Record<Rarity, number>> = { SR: 1, SSR: 2, UR: 3 };
+  const count = effectCount[rarity] ?? 0;
+  if (count > 0) {
     const pool = ALL_EFFECTS.filter((e) => ORDER[e.minRarity] <= ORDER[rarity]).map((e) => e.id);
-    const count = rarity === 'SR' ? 1 : 2 + (rng() < 0.5 ? 1 : 0);
     const shuffled = [...pool];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(rng() * (i + 1));
@@ -245,5 +259,10 @@ export function partsKey(ids: Record<string, string>, effects: string[]): string
   return DIMENSIONS.map((d) => ids[d]).join('|') + '#' + [...effects].sort().join(',');
 }
 
-export const SHARD_ON_DUP: Record<Rarity, number> = { N: 10, R: 30, SR: 100, SSR: 300 };
-export const WISH_COST: Record<Exclude<Rarity, 'N'>, number> = { R: 300, SR: 1000, SSR: 3000 };
+export const SHARD_ON_DUP: Record<Rarity, number> = { N: 10, R: 30, SR: 100, SSR: 300, UR: 800 };
+export const WISH_COST: Record<Exclude<Rarity, 'N'>, number> = {
+  R: 300,
+  SR: 1000,
+  SSR: 3000,
+  UR: 8000,
+};

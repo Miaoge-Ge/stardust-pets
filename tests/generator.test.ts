@@ -9,8 +9,8 @@ import {
   type Rarity,
 } from '../src/gen/generator';
 
-const ORDER: Record<Rarity, number> = { N: 0, R: 1, SR: 2, SSR: 3 };
-const RARITIES: Rarity[] = ['N', 'R', 'SR', 'SSR'];
+const ORDER: Record<Rarity, number> = { N: 0, R: 1, SR: 2, SSR: 3, UR: 4 };
+const RARITIES: Rarity[] = ['N', 'R', 'SR', 'SSR', 'UR'];
 
 describe('生成器约束(属性测试)', () => {
   it('每个稀有度 × 10000 seed:维度齐全、约束满足、特效数量正确', () => {
@@ -45,16 +45,14 @@ describe('生成器约束(属性测试)', () => {
           }
         }
 
-        // 3. 特效数量:N/R 无,SR 恰 1,SSR 2~3
-        if (rarity === 'N' || rarity === 'R') expect(pet.effects.length).toBe(0);
-        if (rarity === 'SR') expect(pet.effects.length).toBe(1);
-        if (rarity === 'SSR') {
-          expect(pet.effects.length).toBeGreaterThanOrEqual(2);
-          expect(pet.effects.length).toBeLessThanOrEqual(3);
-        }
+        // 3. 特效数量:N/R 无,SR 恰 1,SSR 恰 2,UR 恰 3
+        const expected = { N: 0, R: 0, SR: 1, SSR: 2, UR: 3 }[rarity];
+        expect(pet.effects.length).toBe(expected);
 
-        // 4. 专属规则:史莱姆必为果冻材质;龙角只配龙
-        if (pet.ids.species === 'sp_slime') expect(pet.ids.material).toBe('mat_jelly');
+        // 4. 专属规则:软体物种(史莱姆/章鱼/幽灵)必为果冻材质;龙角只配龙
+        if (['sp_slime', 'sp_octopus', 'sp_ghost'].includes(pet.ids.species)) {
+          expect(pet.ids.material).toBe('mat_jelly');
+        }
         if (pet.ids.ears === 'ears_horn') expect(pet.ids.species).toBe('sp_dragon');
       }
     }

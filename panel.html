@@ -16,6 +16,7 @@
       --r: #5a9fd9;
       --sr: #a56ae8;
       --ssr: #f2c14e;
+      --ur: #ff5d8f;
       --accent: #f2c14e;
     }
     body {
@@ -74,7 +75,7 @@
       background: var(--card); border: 2px solid var(--n); border-radius: 10px;
       padding: 8px; text-align: center; position: relative;
     }
-    .card img, .card canvas { width: 96px; height: 96px; image-rendering: pixelated; }
+    .card img, .card canvas { width: 96px; height: 96px; }
     .card .nm { font-size: 12px; margin-top: 4px; }
     .card .rar { font-size: 11px; font-weight: 700; }
     .card.N { border-color: var(--n); }   .card.N .rar { color: var(--n); }
@@ -82,6 +83,23 @@
     .card.SR { border-color: var(--sr); } .card.SR .rar { color: var(--sr); }
     .card.SSR { border-color: var(--ssr); box-shadow: 0 0 14px rgba(242,193,78,.45); }
     .card.SSR .rar { color: var(--ssr); }
+    .card.UR {
+      border-color: var(--ur);
+      box-shadow: 0 0 18px rgba(255,93,143,.55);
+      animation: urPulse 2.2s ease-in-out infinite;
+    }
+    .card.UR .rar {
+      background: linear-gradient(90deg, #ff5d8f, #ffb347, #7ef0c3, #6ab7ff, #c58cff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      font-weight: 800;
+    }
+    @keyframes urPulse {
+      0%, 100% { box-shadow: 0 0 14px rgba(255,93,143,.45); }
+      33% { box-shadow: 0 0 20px rgba(126,240,195,.55); }
+      66% { box-shadow: 0 0 20px rgba(106,183,255,.55); }
+    }
     .card .dup {
       position: absolute; top: 4px; right: 4px;
       background: rgba(0,0,0,.55); border-radius: 4px;
@@ -97,6 +115,7 @@
     .history .row { display: flex; gap: 12px; padding: 3px 0; font-size: 12px; color: var(--dim); }
     .history .row b.N { color: var(--n); } .history .row b.R { color: var(--r); }
     .history .row b.SR { color: var(--sr); } .history .row b.SSR { color: var(--ssr); }
+    .history .row b.UR { color: var(--ur); }
 
     /* 抽卡动画遮罩 */
     #eggOverlay {
@@ -118,6 +137,17 @@
     .egg.R { background: #6db3ef; box-shadow: 0 0 34px rgba(109,179,239,.6); }
     .egg.SR { background: #b57ff5; box-shadow: 0 0 40px rgba(181,127,245,.7); }
     .egg.SSR { background: #f5cd5e; box-shadow: 0 0 55px rgba(245,205,94,.95); }
+    .egg.UR {
+      background: linear-gradient(135deg, #ff5d8f, #ffb347, #7ef0c3, #6ab7ff, #c58cff);
+      background-size: 300% 300%;
+      box-shadow: 0 0 70px rgba(255,120,180,.9);
+      animation: shake .5s ease-in-out infinite, urFlow 2s linear infinite;
+    }
+    @keyframes urFlow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
     #eggOverlay .tip { color: var(--dim); font-size: 12px; }
 
     /* 图鉴页 */
@@ -136,6 +166,7 @@
     .chip.locked { color: #59536b; }
     .chip.N { border-color: var(--n); } .chip.R { border-color: var(--r); }
     .chip.SR { border-color: var(--sr); } .chip.SSR { border-color: var(--ssr); }
+    .chip.UR { border-color: var(--ur); }
     .ach { background: var(--card); border-radius: 10px; padding: 10px 14px; margin-bottom: 10px;
       display: flex; align-items: center; gap: 12px; }
     .ach .info { flex: 1; }
@@ -152,7 +183,7 @@
       background: var(--card); border: 1px solid var(--line); border-radius: 14px;
       padding: 20px; width: 340px; text-align: center;
     }
-    #detail canvas { width: 144px; height: 144px; image-rendering: pixelated; }
+    #detail canvas { width: 144px; height: 144px; }
     #detail .meta { font-size: 12px; color: var(--dim); margin: 8px 0; line-height: 1.8; }
     #detail .row { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
 
@@ -182,6 +213,10 @@
         <div class="pity">
           <div>SSR 保底　<span id="pitySsrText"></span></div>
           <div class="bar"><div class="fill" id="pitySsrFill" style="background:var(--ssr)"></div></div>
+        </div>
+        <div class="pity">
+          <div>UR 保底　<span id="pityUrText"></span></div>
+          <div class="bar"><div class="fill" id="pityUrFill" style="background:var(--ur)"></div></div>
         </div>
       </div>
       <div class="gacha-actions">
@@ -228,6 +263,7 @@
             <option value="R">R(300 碎片)</option>
             <option value="SR">SR(1000 碎片)</option>
             <option value="SSR">SSR(3000 碎片)</option>
+            <option value="UR">UR(8000 碎片)</option>
           </select>
           <select id="wishSpecies"></select>
           <button class="primary" id="wishBtn">定制</button>

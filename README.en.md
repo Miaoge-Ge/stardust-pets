@@ -21,9 +21,9 @@ Built with Tauri 2 (Rust) + TypeScript + PixiJS · Local SQLite · Privacy-first
 - 22 FSM-driven actions: sit / lie / sleep / groom / chase tail / wander / **climb up and sit on the top edge of your active window** / struggle when dragged / sulk with its back turned…
 - Pat it and it squints and blushes; triple-click and it jumps with joy; poke it while asleep and it startles awake first
 
-### 🎰 Tens of millions of collectible forms
-- **11 part dimensions**: 8 species (cat / dog / rabbit / fox / hamster / bird / slime / baby dragon) × body type × material (fur / translucent jelly / scales / stardust) × ears × tail × eyes × mouth × 12 coat patterns × procedural palettes × headwear × neckwear — over 40M discrete combos, and palette jitter makes each pet practically unique
-- Four rarity tiers (N 65% / R 25% / SR 8.5% / SSR 1.5%) with **dual pity** (guaranteed SR within 50 pulls, SSR within 100). Rates verified by Monte Carlo tests: 10,000 pulls × 10 rounds, deviation < 1%
+### 🎰 Hundreds of millions of collectible forms
+- **11 part dimensions**: **20 species** (cat / dog / rabbit / fox / hamster / bird / duck / hedgehog / panda / penguin / turtle / owl / deer / slime / octopus / bat / baby dragon / ghost / unicorn / phoenix) × body type × material (fur / translucent jelly / scales / stardust) × ears × tail × eyes × mouth × 13 coat patterns × procedural palettes × headwear × neckwear — 100M+ discrete combos, and palette jitter makes each pet practically unique
+- **Five rarity tiers** (N 58% / R 27% / SR 10% / SSR 4.2% / **UR 0.8%**) with **triple pity** (guaranteed SR within 50 pulls, SSR within 100, UR within 200). Rates verified by Monte Carlo tests: 10,000 pulls × 10 rounds, deviation < 1%. UR-exclusive species (unicorn / phoenix), rainbow aura effect and animated rainbow cards
 - Star-coin economy: idle earnings / daily check-in / daily tasks / health tasks; duplicates convert to shards, redeemable for wish-crafted pets of your chosen species
 - **Two-layer codex**: every owned pet re-rendered from its seed; a parts codex with ??? silhouettes to light up; set-collection achievements with rewards
 

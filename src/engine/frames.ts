@@ -1,6 +1,10 @@
 /** 动作帧参数表(与形态解耦):buildFrameSets(look) 为任意部件组合生成全套动作帧 */
 import type { Colors } from '../gen/generator';
+import { GRID, upscale4x } from './pixel';
 import { drawPetFrame, type FP, type Look } from './petArt';
+
+/** 贴图尺寸:48 基底 → Scale2x×2 = 192,渲染层再线性缩到展示尺寸(消除马赛克) */
+export const TEX_SIZE = GRID * 4;
 
 function sit(over: Partial<FP> = {}): FP {
   return { pose: 'sit', ...over };
@@ -165,14 +169,14 @@ const LISTS = buildLists();
 export function buildFrameSets(look: Look): Record<string, HTMLCanvasElement[]> {
   const out: Record<string, HTMLCanvasElement[]> = {};
   for (const [key, frames] of Object.entries(LISTS)) {
-    out[key] = frames.map((fp, i) => drawPetFrame(look, { ...fp, frameIdx: i }));
+    out[key] = frames.map((fp, i) => upscale4x(drawPetFrame(look, { ...fp, frameIdx: i })));
   }
   return out;
 }
 
-/** 单帧立绘(图鉴/抽卡结算用):坐姿第 1 帧 */
+/** 单帧立绘(图鉴/抽卡结算用):坐姿第 1 帧,已平滑放大 */
 export function drawPortrait(look: Look): HTMLCanvasElement {
-  return drawPetFrame(look, { pose: 'sit', eye: 'open', tail: 0.3, frameIdx: 0 });
+  return upscale4x(drawPetFrame(look, { pose: 'sit', eye: 'open', tail: 0.3, frameIdx: 0 }));
 }
 
 /** 兼容旧存档(一期占位宠物)与生成器输出 → Look */

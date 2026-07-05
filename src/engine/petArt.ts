@@ -1,10 +1,10 @@
 /**
  * 部件化像素宠物绘制:
- *   drawPetFrame(look, fp) → 48×48 canvas
- * look = 物种/体型/耳/尾/眼/嘴/花纹/材质/配饰/色板(由生成器解析);
- * fp   = 单帧姿态参数(与动作解耦,所有部件组合共用同一套姿态)。
+ *   drawPetFrame(look, fp) → 48×48 canvas(渲染层再经 Scale2x×2 平滑放大)
+ * 物种系统:20 种,由「体格修正 + 类别(quad 四足 / bird 鸟类 / blob 软体)+ 特征开关」描述,
+ * 新物种只需在 SPEC 表加一行 + 至多一个特征绘制函数。
  * 渲染次序:披风(后景) → 身体填色 → 明暗着色 → 花纹 → 材质 → 描边
- *          → 五官 → 配饰 → 状态图标 → 发光特效
+ *          → 物种特征 → 五官 → 配饰 → 状态图标 → 发光特效
  */
 import type { Colors } from '../gen/generator';
 import { GRID, Mask, haloMask, outlineMask, paintMask, px } from './pixel';
@@ -51,7 +51,6 @@ export interface FP {
   frameIdx?: number;
 }
 
-// 固定 UI 色(不随色板变化)
 const UI = {
   eye: '#2b2b33',
   white: '#ffffff',
@@ -70,27 +69,65 @@ const UI = {
   goldDark: '#b58a2a',
   gem: '#e8574d',
   beak: '#e8a13d',
+  duckBeak: '#f2b035',
   frame: '#3a3a45',
+  pandaDark: '#3a3540',
+  antler: '#8a6437',
 };
 
-interface Mods {
+// ---------------------------------------------------------------- 物种表(20 种)
+
+interface Spec {
   bw: number; // 身体宽度增量
   bh: number; // 身体高度增量
   hr: number; // 头半径增量
+  kind: 'quad' | 'bird' | 'blob';
+  muzzle?: boolean;
+  beak?: boolean;
+  flatBeak?: boolean;
+  eyeRings?: boolean;
+  mask?: boolean;
+  spines?: boolean;
+  shell?: boolean;
+  antlers?: boolean;
+  batWings?: boolean;
+  horn?: boolean;
+  crest?: boolean;
+  tentacles?: boolean;
+  floaty?: boolean;
+  bigBelly?: boolean;
+  spikes?: boolean;
+  wingPatch?: boolean;
 }
 
-const SPECIES_MOD: Record<string, Mods> = {
-  sp_cat: { bw: 0, bh: 0, hr: 0 },
-  sp_dog: { bw: 1, bh: 0, hr: 0 },
-  sp_rabbit: { bw: -1, bh: 1, hr: 0 },
-  sp_fox: { bw: 0, bh: 0, hr: 0 },
-  sp_hamster: { bw: 2, bh: -1, hr: 1 },
-  sp_bird: { bw: -1, bh: 0, hr: 0 },
-  sp_slime: { bw: 0, bh: 0, hr: 0 },
-  sp_dragon: { bw: 1, bh: 0, hr: 0 },
+const SPEC: Record<string, Spec> = {
+  sp_cat:      { bw: 0, bh: 0, hr: 0, kind: 'quad' },
+  sp_dog:      { bw: 1, bh: 0, hr: 0, kind: 'quad', muzzle: true },
+  sp_rabbit:   { bw: -1, bh: 1, hr: 0, kind: 'quad' },
+  sp_fox:      { bw: 0, bh: 0, hr: 0, kind: 'quad', muzzle: true },
+  sp_hamster:  { bw: 2, bh: -1, hr: 1, kind: 'quad' },
+  sp_bird:     { bw: -1, bh: 0, hr: 0, kind: 'bird', beak: true, wingPatch: true },
+  sp_duck:     { bw: 0, bh: 0, hr: 0, kind: 'bird', flatBeak: true, wingPatch: true },
+  sp_hedgehog: { bw: 1, bh: -1, hr: 0, kind: 'quad', spines: true },
+  sp_panda:    { bw: 2, bh: 0, hr: 1, kind: 'quad', mask: true },
+  sp_penguin:  { bw: 0, bh: 2, hr: 0, kind: 'bird', beak: true, bigBelly: true },
+  sp_turtle:   { bw: 2, bh: -1, hr: -1, kind: 'quad', shell: true },
+  sp_owl:      { bw: 0, bh: 1, hr: 1, kind: 'bird', beak: true, eyeRings: true, wingPatch: true },
+  sp_deer:     { bw: -1, bh: 1, hr: 0, kind: 'quad', antlers: true, muzzle: true },
+  sp_slime:    { bw: 0, bh: 0, hr: 0, kind: 'blob' },
+  sp_octopus:  { bw: 0, bh: 0, hr: 0, kind: 'blob', tentacles: true },
+  sp_bat:      { bw: -1, bh: 0, hr: 1, kind: 'quad', batWings: true },
+  sp_dragon:   { bw: 1, bh: 0, hr: 0, kind: 'quad', spikes: true },
+  sp_ghost:    { bw: 0, bh: 1, hr: 0, kind: 'blob', floaty: true },
+  sp_unicorn:  { bw: 0, bh: 1, hr: 0, kind: 'quad', horn: true, muzzle: true },
+  sp_phoenix:  { bw: -1, bh: 0, hr: 0, kind: 'bird', beak: true, crest: true, wingPatch: true },
 };
 
-const BODY_MOD: Record<string, Mods> = {
+function specOf(look: Look): Spec {
+  return SPEC[look.species] ?? SPEC.sp_cat;
+}
+
+const BODY_MOD: Record<string, { bw: number; bh: number; hr: number }> = {
   body_round: { bw: 1, bh: 0, hr: 0 },
   body_slim: { bw: -1, bh: 1, hr: 0 },
   body_chub: { bw: 2, bh: -1, hr: 0 },
@@ -102,7 +139,7 @@ interface Anchors {
   hy: number;
   hr: number;
   face: boolean;
-  nx: number; // 颈部锚点
+  nx: number;
   ny: number;
   bodyCx: number;
   bodyCy: number;
@@ -115,36 +152,36 @@ function addEars(m: Mask, look: Look, hx: number, hy: number, hr: number, flat: 
   if (id === 'ears_none') return;
   const baseY = hy - hr + 4;
   switch (id) {
-    case 'ears_flop': // 垂耳:头两侧下垂的椭圆
+    case 'ears_flop':
       m.ellipse(hx - hr - 1, hy - 2, 3, 5);
       m.ellipse(hx + hr + 1, hy - 2, 3, 5);
       return;
-    case 'ears_fold': { // 折耳:小而弯的三角
+    case 'ears_fold': {
       const apex = hy - hr - 2;
       m.tri(hx - 7, baseY, hx - 6, apex, hx - 1, baseY - 1);
       m.tri(hx + 1, baseY - 1, hx + 6, apex, hx + 7, baseY);
       return;
     }
-    case 'ears_rabbit': // 长耳:竖长椭圆
+    case 'ears_rabbit':
       m.ellipse(hx - 4, hy - hr - 6 + (flat ? 4 : 0), 2.5, 7);
       m.ellipse(hx + 4, hy - hr - 6 + (flat ? 4 : 0), 2.5, 7);
       return;
-    case 'ears_round': // 圆耳(仓鼠/熊式)
+    case 'ears_round':
       m.circle(hx - hr + 1, hy - hr + 1, 3.5);
       m.circle(hx + hr - 1, hy - hr + 1, 3.5);
       return;
-    case 'ears_horn': { // 龙角:双弯角
+    case 'ears_horn': {
       m.tri(hx - 6, hy - hr + 3, hx - 9, hy - hr - 5, hx - 3, hy - hr + 1);
       m.tri(hx + 3, hy - hr + 1, hx + 9, hy - hr - 5, hx + 6, hy - hr + 3);
       return;
     }
-    case 'ears_sharp': { // 尖耳(狐):更大更锐
+    case 'ears_sharp': {
       const apex = flat ? hy - hr - 2 : hy - hr - 8;
       m.tri(hx - 9, baseY + 1, hx - 5, apex, hx - 1, baseY - 2);
       m.tri(hx + 1, baseY - 2, hx + 5, apex, hx + 9, baseY + 1);
       return;
     }
-    default: { // ears_up 立耳
+    default: {
       const apex = flat ? hy - hr - 1 : hy - hr - 6;
       m.tri(hx - 7, baseY, hx - 5, apex, hx - 1, baseY - 1);
       m.tri(hx + 1, baseY - 1, hx + 5, apex, hx + 7, baseY);
@@ -154,7 +191,7 @@ function addEars(m: Mask, look: Look, hx: number, hy: number, hr: number, flat: 
 
 function earInnerDetail(ctx: CanvasRenderingContext2D, look: Look, hx: number, hy: number, hr: number, flat: boolean): void {
   if (look.ears === 'ears_none' || flat) return;
-  const c = look.colors.belly;
+  const c = specOf(look).mask ? UI.pandaDark : look.colors.belly;
   if (look.ears === 'ears_rabbit') {
     px(ctx, hx - 4, hy - hr - 8, c, 1, 5);
     px(ctx, hx + 4, hy - hr - 8, c, 1, 5);
@@ -174,27 +211,27 @@ function addTail(m: Mask, look: Look, base: [number, number], sway: number, pose
   const [bx, by] = base;
   const pts: Array<[number, number]> = [];
   if (id === 'tail_none') return pts;
-  const up = pose === 'sit' || pose === 'back' ? 0.6 : 1; // 坐姿尾巴贴地一些
+  const up = pose === 'sit' || pose === 'back' ? 0.6 : 1;
   switch (id) {
     case 'tail_short':
       pts.push([bx, by], [bx - 1, by - 1]);
       break;
-    case 'tail_curl': // 卷尾:螺旋
+    case 'tail_curl':
       pts.push([bx, by], [bx - 2, by - 3 * up], [bx - 1, by - 6 * up], [bx + 1 + sway, by - 7 * up], [bx + 2 + sway, by - 5 * up]);
       break;
-    case 'tail_fluffy': // 蓬松大尾
+    case 'tail_fluffy':
       for (let i = 0; i < 4; i++) pts.push([bx - i * 2 - sway * i, by - i * 3 * up]);
       break;
-    case 'tail_twin': // 双尾
+    case 'tail_twin':
       for (let i = 0; i < 4; i++) {
         pts.push([bx - i * 1.5 - sway * i, by - i * 3 * up]);
         pts.push([bx - i * 0.5 + sway * i, by - i * 3.2 * up]);
       }
       break;
-    case 'tail_star': // 星光尾:细长上扬
+    case 'tail_star':
       for (let i = 0; i < 5; i++) pts.push([bx - i * 1.2 - sway * i * 0.8, by - i * 3.4 * up]);
       break;
-    default: // tail_long
+    default:
       for (let i = 0; i < 5; i++) pts.push([bx - i * 1.3 - sway * i * 1.1, by - i * 3 * up]);
   }
   const r = id === 'tail_fluffy' ? 3 : 2;
@@ -224,17 +261,15 @@ function buildSilhouette(m: Mask, look: Look, p: FP): { a: Anchors; tailPts: Arr
   const hdx = p.headDx ?? 0;
   const hdy = p.headDy ?? 0;
   const phase = (p.legPhase ?? 1) % 4;
-  const sm = SPECIES_MOD[look.species] ?? SPECIES_MOD.sp_cat;
+  const spec = specOf(look);
   const bm = BODY_MOD[look.body] ?? BODY_MOD.body_round;
-  const bw = sm.bw + bm.bw;
-  const bh = sm.bh + bm.bh;
-  const hr = 9 + sm.hr + bm.hr;
-  const isBird = look.species === 'sp_bird';
-  const isSlime = look.species === 'sp_slime';
+  const bw = spec.bw + bm.bw;
+  const bh = spec.bh + bm.bh;
+  const hr = 9 + spec.hr + bm.hr;
   let tailPts: Array<[number, number]> = [];
 
-  // —— 史莱姆:所有姿态统一为软糖圆顶,靠压扁/拉伸表达 ——
-  if (isSlime) {
+  // —— 软体(史莱姆/章鱼/幽灵):圆顶,靠压扁/拉伸表达姿态 ——
+  if (spec.kind === 'blob') {
     let rx = 12 + bw;
     let ry = 9 + bh - q;
     let cy = 45 - ry + 1;
@@ -247,13 +282,28 @@ function buildSilhouette(m: Mask, look: Look, p: FP): { a: Anchors; tailPts: Arr
       ry += 3;
       cy = 40 - ry / 2 + b;
     } else if (p.pose === 'stand') {
-      ry += phase % 2 === 0 ? -1 : 1; // 走路 = 果冻弹跳
+      ry += phase % 2 === 0 ? -1 : 1;
       cy = 45 - ry + 1 + b;
     } else {
       cy = 45 - ry + 1 + b;
     }
+    if (spec.floaty) cy -= 4 + (p.frameIdx ?? 0) % 2; // 幽灵漂浮
     m.ellipse(24, cy, rx, ry);
+    if (spec.tentacles) {
+      // 章鱼:底部一圈触手
+      for (let i = 0; i < 4; i++) {
+        const tx = 24 - rx + 4 + (i * (rx * 2 - 8)) / 3;
+        m.circle(tx, Math.min(44, cy + ry - 1) + (i % 2), 2.5);
+      }
+    }
     m.clearBelow(45);
+    if (spec.floaty) {
+      // 幽灵:底缘波浪缺口
+      const bottom = cy + ry - 1;
+      m.subCircle(18, bottom + 2, 3);
+      m.subCircle(27, bottom + 2, 3);
+      m.subCircle(35, bottom + 2, 2.5);
+    }
     addEars(m, look, 24, cy - 2, Math.round(ry), !!p.earFlat);
     tailPts = addTail(m, look, [24 - rx + 2, 44], t, p.pose);
     const face = p.pose !== 'back';
@@ -263,11 +313,14 @@ function buildSilhouette(m: Mask, look: Look, p: FP): { a: Anchors; tailPts: Arr
     };
   }
 
+  const isBird = spec.kind === 'bird';
+
   switch (p.pose) {
     case 'stand': {
       const hx = 32 + hdx;
       const hy = 19 + b + hdy;
       m.ellipse(21, 33 + b, 11 + bw, 7 + bh + q);
+      if (spec.batWings) m.tri(7, 24 + b, 17, 21 + b, 17, 34 + b);
       if (isBird) {
         m.rect(18, 38 + b, 2, 45 - (38 + b) + 1);
         m.rect(26, 38 + b, 2, 45 - (38 + b) + 1);
@@ -291,6 +344,7 @@ function buildSilhouette(m: Mask, look: Look, p: FP): { a: Anchors; tailPts: Arr
       const hy = 16 + b + hdy;
       m.ellipse(21, 33 + b, 9 + bw, 11 + bh + q);
       m.circle(15, 38, 6 + bw / 2);
+      if (spec.batWings) m.tri(8, 26 + b, 16, 22 + b, 16, 36 + b);
       m.rect(24, 34 + b, 3, 45 - (34 + b) + 1);
       if (p.pawUp) {
         m.circle(31, 30 + (p.pawY ?? 0), 3);
@@ -381,7 +435,6 @@ function buildSilhouette(m: Mask, look: Look, p: FP): { a: Anchors; tailPts: Arr
 // ---------------------------------------------------------------- 着色/花纹/材质
 
 function shadingPass(ctx: CanvasRenderingContext2D, m: Mask, c: Colors): void {
-  // 底部阴影 + 顶部高光:让形体有体积感
   for (let y = 0; y < GRID; y++) {
     for (let x = 0; x < GRID; x++) {
       if (!m.get(x, y)) continue;
@@ -415,10 +468,7 @@ function patternPass(ctx: CanvasRenderingContext2D, m: Mask, look: Look, a: Anch
   const { minY, maxY } = bounds(m);
   const span = Math.max(1, maxY - minY);
 
-  const mixHex = (t: number): string => {
-    // 简易混色:避免逐像素 import,渐变用 pattern↔body 两端近似分档
-    return t < 0.33 ? c.body : t < 0.66 ? blend(c.body, c.pattern) : c.pattern;
-  };
+  const mixHex = (t: number): string => (t < 0.33 ? c.body : t < 0.66 ? blend(c.body, c.pattern) : c.pattern);
 
   for (let y = 0; y < GRID; y++) {
     for (let x = 0; x < GRID; x++) {
@@ -466,6 +516,16 @@ function patternPass(ctx: CanvasRenderingContext2D, m: Mask, look: Look, a: Anch
           else if (h < 0.3) px(ctx, x, y, c.light);
           break;
         }
+        case 'pat_galaxy': {
+          // 银河纹:深底 + 旋臂亮带 + 密集星点
+          px(ctx, x, y, blend(c.outline, c.shade));
+          const arm = Math.abs(((x - a.bodyCx) * 0.7 + (y - a.bodyCy) * 1.2) % 9);
+          if (arm < 2) px(ctx, x, y, blend(c.light, c.pattern));
+          const h = hash2(x, y);
+          if (h < 0.08) px(ctx, x, y, UI.white);
+          else if (h < 0.14) px(ctx, x, y, UI.gold);
+          break;
+        }
       }
     }
   }
@@ -489,36 +549,121 @@ function inBlob(x: number, y: number, cx: number, cy: number, rx: number, ry: nu
 function materialPass(ctx: CanvasRenderingContext2D, m: Mask, look: Look, frameIdx: number): void {
   const c = look.colors;
   switch (look.material) {
-    case 'mat_sleek': // 光滑:顶部斜向高光条
+    case 'mat_sleek':
       for (let i = 0; i < 6; i++) {
         const x = 16 + i;
         const y = 26 - i;
         if (m.get(x, y) && !m.isEdge(x, y)) px(ctx, x, y, c.light);
       }
       break;
-    case 'mat_scales': // 鳞片:错位点阵
+    case 'mat_scales':
       for (let y = 0; y < GRID; y++)
         for (let x = 0; x < GRID; x++)
           if (m.get(x, y) && !m.isEdge(x, y) && (x + y * 2) % 5 === 0 && y > 24) px(ctx, x, y, c.shade);
       break;
-    case 'mat_stardust': { // 星尘:身体内随帧闪烁的星点
+    case 'mat_stardust': {
       for (let y = 0; y < GRID; y++)
         for (let x = 0; x < GRID; x++)
           if (m.get(x, y) && !m.isEdge(x, y) && hash2(x + frameIdx * 7, y) < 0.03)
             px(ctx, x, y, hash2(x, y + frameIdx) < 0.5 ? UI.white : UI.gold);
       break;
     }
-    case 'mat_jelly': { // 果冻:大块高光 + 内核
+    case 'mat_jelly': {
       const { minY } = bounds(m);
       for (let y = 0; y < GRID; y++)
         for (let x = 0; x < GRID; x++)
           if (m.get(x, y) && !m.isEdge(x, y) && inBlob(x, y, 19, minY + 6, 4, 3)) px(ctx, x, y, c.light);
       break;
     }
-    default: // mat_fur:边缘细碎绒毛
+    default:
       for (let y = 0; y < GRID; y++)
         for (let x = 0; x < GRID; x++)
           if (!m.get(x, y) && m.get(x, y + 1) && hash2(x, y) < 0.22) px(ctx, x, y, c.body);
+  }
+}
+
+// ---------------------------------------------------------------- 物种特征细节
+
+function speciesDetail(ctx: CanvasRenderingContext2D, m: Mask, look: Look, a: Anchors, p: FP): void {
+  const spec = specOf(look);
+  const c = look.colors;
+  const grounded = p.pose === 'stand' || p.pose === 'sit';
+
+  if (spec.wingPatch && grounded) {
+    const wm = new Mask();
+    wm.ellipse(a.bodyCx - 3, a.bodyCy + 1, 4, 3);
+    for (let y = 0; y < GRID; y++)
+      for (let x = 0; x < GRID; x++) if (wm.get(x, y) && m.get(x, y)) px(ctx, x, y, c.shade);
+  }
+  if (spec.bigBelly && a.face) {
+    // 企鹅大白肚
+    for (let y = 0; y < GRID; y++)
+      for (let x = 0; x < GRID; x++)
+        if (m.get(x, y) && !m.isEdge(x, y) && inBlob(x, y, a.bodyCx + 2, a.bodyCy + 2, 6, 7))
+          px(ctx, x, y, c.belly);
+  }
+  if (spec.spikes && grounded) {
+    const top = (p.pose === 'stand' ? 26 : 24) + (p.bob ?? 0);
+    for (let i = 0; i < 3; i++) {
+      const sx = a.bodyCx - 5 + i * 4;
+      px(ctx, sx, top - i, c.pattern, 2, 2);
+      px(ctx, sx, top - i - 1, c.pattern, 1, 1);
+    }
+  }
+  if (spec.spines && grounded) {
+    // 刺猬:背部两排小刺
+    const top = (p.pose === 'stand' ? 27 : 25) + (p.bob ?? 0);
+    for (let i = 0; i < 5; i++) {
+      const sx = a.bodyCx - 8 + i * 3;
+      px(ctx, sx, top - (i % 2), c.pattern, 1, 2);
+      px(ctx, sx, top - (i % 2) - 1, c.outline, 1, 1);
+    }
+  }
+  if (spec.shell && grounded) {
+    // 龟壳:身体上的大色块 + 网纹
+    for (let y = 0; y < GRID; y++)
+      for (let x = 0; x < GRID; x++)
+        if (m.get(x, y) && !m.isEdge(x, y) && inBlob(x, y, a.bodyCx - 1, a.bodyCy - 1, 8, 5)) {
+          px(ctx, x, y, c.pattern);
+          if ((x + y) % 4 === 0) px(ctx, x, y, c.shade);
+        }
+  }
+  if (spec.antlers && a.face) {
+    // 小鹿角
+    const ax = a.hx;
+    const ay = a.hy - a.hr;
+    px(ctx, ax - 5, ay - 4, UI.antler, 1, 4);
+    px(ctx, ax - 7, ay - 3, UI.antler, 2, 1);
+    px(ctx, ax + 4, ay - 4, UI.antler, 1, 4);
+    px(ctx, ax + 5, ay - 3, UI.antler, 2, 1);
+  }
+  if (spec.horn && a.face) {
+    // 独角 + 鬃毛
+    const ax = a.hx;
+    const ay = a.hy - a.hr;
+    px(ctx, ax - 1, ay - 5, UI.gold, 2, 5);
+    px(ctx, ax, ay - 6, UI.goldDark, 1, 1);
+    px(ctx, ax - a.hr + 1, ay + 3, c.pattern, 2, 5);
+    px(ctx, ax - a.hr, ay + 6, c.pattern, 2, 4);
+  }
+  if (spec.crest && a.face) {
+    // 凤凰头羽
+    const ax = a.hx;
+    const ay = a.hy - a.hr;
+    px(ctx, ax - 2, ay - 4, c.accent, 1, 4);
+    px(ctx, ax, ay - 5, c.pattern, 1, 5);
+    px(ctx, ax + 2, ay - 3, c.accent, 1, 3);
+  }
+  if (spec.tentacles && grounded) {
+    // 章鱼吸盘点
+    for (let i = 0; i < 3; i++) px(ctx, 17 + i * 7, 43, c.belly, 1, 1);
+  }
+  if (spec.batWings && grounded) {
+    // 蝠翼膜面
+    for (let y = 0; y < GRID; y++)
+      for (let x = 0; x < GRID; x++)
+        if (m.get(x, y) && x < a.bodyCx - 5 && y < a.bodyCy + 3 && !m.isEdge(x, y) && hash2(x, y) < 0.5)
+          px(ctx, x, y, c.shade);
   }
 }
 
@@ -532,7 +677,7 @@ function drawOpenEye(ctx: CanvasRenderingContext2D, look: Look, x: number, y: nu
       px(ctx, x, y, UI.white);
       break;
     case 'eye_sleepy':
-      px(ctx, x - 1, y, UI.eye, 3, 1); // 眼睑
+      px(ctx, x - 1, y, UI.eye, 3, 1);
       px(ctx, x, y + 1, UI.eye, 2, 1);
       break;
     case 'eye_catslit':
@@ -558,7 +703,7 @@ function drawOpenEye(ctx: CanvasRenderingContext2D, look: Look, x: number, y: nu
       px(ctx, x - 1, y - 1, UI.eye, 3, 3);
       px(ctx, x, y, c.light);
       break;
-    default: // eye_round
+    default:
       px(ctx, x, y, UI.eye, 2, 3);
       px(ctx, x, y, UI.white);
   }
@@ -567,10 +712,28 @@ function drawOpenEye(ctx: CanvasRenderingContext2D, look: Look, x: number, y: nu
 function drawFace(ctx: CanvasRenderingContext2D, look: Look, a: Anchors, p: FP): void {
   const { hx, hy } = a;
   const c = look.colors;
+  const spec = specOf(look);
   const eye = p.eye ?? 'open';
   const lx = hx - 5;
   const rx = hx + 3;
   const ey = hy - 1;
+
+  if (spec.mask) {
+    // 熊猫眼斑(画在眼睛下层)
+    for (let yy = ey - 2; yy <= ey + 3; yy++)
+      for (let xx = lx - 2; xx <= lx + 3; xx++) if (inBlob(xx, yy, lx + 0.5, ey + 0.5, 3, 3)) px(ctx, xx, yy, UI.pandaDark);
+    for (let yy = ey - 2; yy <= ey + 3; yy++)
+      for (let xx = rx - 2; xx <= rx + 3; xx++) if (inBlob(xx, yy, rx + 0.5, ey + 0.5, 3, 3)) px(ctx, xx, yy, UI.pandaDark);
+  }
+  if (spec.eyeRings) {
+    // 猫头鹰眼环
+    for (const cx0 of [lx + 0.5, rx + 0.5])
+      for (let yy = ey - 3; yy <= ey + 4; yy++)
+        for (let xx = cx0 - 4; xx <= cx0 + 4; xx++) {
+          const d = ((xx - cx0) / 3.2) ** 2 + ((yy - ey - 0.5) / 3.2) ** 2;
+          if (d <= 1 && d > 0.5) px(ctx, xx, yy, c.belly);
+        }
+  }
 
   if (eye === 'open') {
     drawOpenEye(ctx, look, lx, ey, false);
@@ -595,17 +758,20 @@ function drawFace(ctx: CanvasRenderingContext2D, look: Look, a: Anchors, p: FP):
     px(ctx, rx + 1, ey + 1, UI.eye);
   }
 
-  // 鸟:喙代替鼻嘴
-  if (look.species === 'sp_bird') {
-    px(ctx, hx - 1, hy + 2, UI.beak, 3, 1);
-    px(ctx, hx, hy + 3, UI.beak, 1, 1);
-    if (p.mouth === 'open' || p.mouth === 'o') px(ctx, hx, hy + 4, UI.eye);
+  if (spec.beak || spec.flatBeak) {
+    if (spec.flatBeak) {
+      px(ctx, hx - 2, hy + 2, UI.duckBeak, 5, 2);
+      px(ctx, hx - 1, hy + 4, UI.duckBeak, 3, 1);
+    } else {
+      px(ctx, hx - 1, hy + 2, UI.beak, 3, 1);
+      px(ctx, hx, hy + 3, UI.beak, 1, 1);
+    }
+    if (p.mouth === 'open' || p.mouth === 'o') px(ctx, hx, hy + 5, UI.eye);
     if (p.blush) cheeks(ctx, hx, hy);
     return;
   }
 
-  // 吻部(狗/狐)
-  if (look.species === 'sp_dog' || look.species === 'sp_fox') {
+  if (spec.muzzle) {
     for (let yy = hy + 2; yy <= hy + 4; yy++)
       for (let xx = hx - 3; xx <= hx + 3; xx++)
         if (inBlob(xx, yy, hx, hy + 3, 3.4, 2)) px(ctx, xx, yy, c.belly);
@@ -620,7 +786,6 @@ function drawFace(ctx: CanvasRenderingContext2D, look: Look, a: Anchors, p: FP):
     px(ctx, hx - 2, my, UI.eye, 4, 3);
     px(ctx, hx - 1, my + 1, '#f09090', 2, 1);
   } else if (mouthState === 'smile' || mouthState === undefined) {
-    // 使用部件基础嘴型
     switch (look.mouth) {
       case 'mouth_w':
         px(ctx, hx - 3, my, UI.eye);
@@ -638,7 +803,7 @@ function drawFace(ctx: CanvasRenderingContext2D, look: Look, a: Anchors, p: FP):
         px(ctx, hx + 1, my, UI.eye);
         px(ctx, hx + 1, my + 1, UI.white);
         break;
-      default: // mouth_smile
+      default:
         px(ctx, hx - 2, my, UI.eye);
         px(ctx, hx - 1, my + 1, UI.eye, 2, 1);
         px(ctx, hx + 1, my, UI.eye);
@@ -664,7 +829,7 @@ function drawHeadwear(ctx: CanvasRenderingContext2D, look: Look, a: Anchors): vo
       cm.ellipse(hx, topY + 1, hr - 2, 3);
       paintMask(ctx, cm, c.accent);
       outlineMask(ctx, cm, c.outline);
-      px(ctx, hx, topY - 3, c.light, 2, 2); // 顶球
+      px(ctx, hx, topY - 3, c.light, 2, 2);
       break;
     }
     case 'head_bow': {
@@ -760,7 +925,6 @@ function drawNeckwear(ctx: CanvasRenderingContext2D, look: Look, a: Anchors): vo
   }
 }
 
-/** 披风:画在身体之前(后景) */
 function drawCapeBehind(ctx: CanvasRenderingContext2D, look: Look, p: FP): void {
   if (look.neckwear !== 'neck_cape') return;
   const c = look.colors;
@@ -774,7 +938,7 @@ function drawCapeBehind(ctx: CanvasRenderingContext2D, look: Look, p: FP): void 
   px(ctx, 12, 38, UI.gold);
 }
 
-// ---------------------------------------------------------------- 状态图标 / 道具(与一期一致)
+// ---------------------------------------------------------------- 状态图标 / 道具
 
 function drawExtras(ctx: CanvasRenderingContext2D, a: Anchors, p: FP): void {
   if (p.zzz) {
@@ -814,7 +978,6 @@ function drawExtras(ctx: CanvasRenderingContext2D, a: Anchors, p: FP): void {
     const big = (p.frameIdx ?? 0) % 2 === 0;
     const hx0 = a.hx + 10;
     const hy0 = a.hy - 12 + (big ? 0 : 1);
-    // ♥
     px(ctx, hx0, hy0, UI.blushC);
     px(ctx, hx0 + 2, hy0, UI.blushC);
     px(ctx, hx0 - 1, hy0 + 1, UI.blushC, 5, 1);
@@ -852,6 +1015,7 @@ export function drawPetFrame(look: Look, p: FP): HTMLCanvasElement {
   canvas.height = GRID;
   const ctx = canvas.getContext('2d')!;
   const c = look.colors;
+  const spec = specOf(look);
   const frameIdx = p.frameIdx ?? 0;
 
   drawCapeBehind(ctx, look, p);
@@ -867,27 +1031,12 @@ export function drawPetFrame(look: Look, p: FP): HTMLCanvasElement {
   outlineMask(ctx, m, c.outline);
   tailDetail(ctx, look, tailPts);
 
-  // 肚皮(部分姿态)
-  if (!jelly && look.pattern !== 'pat_koi' && look.species !== 'sp_bird') {
+  if (!jelly && look.pattern !== 'pat_koi' && spec.kind !== 'bird' && !spec.shell) {
     if (p.pose === 'sit') paintBelly(ctx, m, c, 23, 34 + (p.bob ?? 0), 4, 5);
     else if (p.pose === 'stand') paintBelly(ctx, m, c, 22, 37 + (p.bob ?? 0), 5, 2);
   }
-  // 鸟:翅膀
-  if (look.species === 'sp_bird' && (p.pose === 'stand' || p.pose === 'sit')) {
-    const wm = new Mask();
-    wm.ellipse(a.bodyCx - 3, a.bodyCy + 1, 4, 3);
-    for (let y = 0; y < GRID; y++)
-      for (let x = 0; x < GRID; x++) if (wm.get(x, y) && m.get(x, y)) px(ctx, x, y, c.shade);
-  }
-  // 龙:背鳍
-  if (look.species === 'sp_dragon' && (p.pose === 'stand' || p.pose === 'sit')) {
-    const top = p.pose === 'stand' ? 26 + (p.bob ?? 0) : 24 + (p.bob ?? 0);
-    for (let i = 0; i < 3; i++) {
-      const sx = a.bodyCx - 5 + i * 4;
-      px(ctx, sx, top - i, c.pattern, 2, 2);
-      px(ctx, sx, top - i - 1, c.pattern, 1, 1);
-    }
-  }
+
+  speciesDetail(ctx, m, look, a, p);
 
   earInnerDetail(ctx, look, a.hx, a.hy, a.hr, !!p.earFlat || p.pose === 'curl' || p.pose === 'hang' || p.pose === 'jump');
 

@@ -31,24 +31,29 @@ export interface GachaState extends PityState {
 
 export async function getGachaState(): Promise<GachaState> {
   const rows = await getDb().select<
-    Array<{ pity_sr: number; pity_ssr: number; total_pulls: number }>
-  >('SELECT pity_sr, pity_ssr, total_pulls FROM gacha_state WHERE id = 1');
-  const r = rows[0] ?? { pity_sr: 0, pity_ssr: 0, total_pulls: 0 };
-  return { sr: Number(r.pity_sr), ssr: Number(r.pity_ssr), total: Number(r.total_pulls) };
+    Array<{ pity_sr: number; pity_ssr: number; pity_ur: number; total_pulls: number }>
+  >('SELECT pity_sr, pity_ssr, pity_ur, total_pulls FROM gacha_state WHERE id = 1');
+  const r = rows[0] ?? { pity_sr: 0, pity_ssr: 0, pity_ur: 0, total_pulls: 0 };
+  return {
+    sr: Number(r.pity_sr),
+    ssr: Number(r.pity_ssr),
+    ur: Number(r.pity_ur ?? 0),
+    total: Number(r.total_pulls),
+  };
 }
 
 async function saveState(pity: PityState, added: number): Promise<void> {
   await getDb().execute(
-    'UPDATE gacha_state SET pity_sr = $1, pity_ssr = $2, total_pulls = total_pulls + $3 WHERE id = 1',
-    [pity.sr, pity.ssr, added]
+    'UPDATE gacha_state SET pity_sr = $1, pity_ssr = $2, pity_ur = $3, total_pulls = total_pulls + $4 WHERE id = 1',
+    [pity.sr, pity.ssr, pity.ur, added]
   );
 }
 
 async function logPull(petId: string | null, rarity: Rarity, dup: boolean, pity: PityState): Promise<void> {
   await getDb().execute(
-    `INSERT INTO gacha_log (ts, result_pet_id, rarity, was_duplicate, pity_sr_after, pity_ssr_after)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [Date.now(), petId, rarity, dup ? 1 : 0, pity.sr, pity.ssr]
+    `INSERT INTO gacha_log (ts, result_pet_id, rarity, was_duplicate, pity_sr_after, pity_ssr_after, pity_ur_after)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [Date.now(), petId, rarity, dup ? 1 : 0, pity.sr, pity.ssr, pity.ur]
   );
 }
 
@@ -62,7 +67,7 @@ export async function pull(count: 1 | 10): Promise<PullResult[] | null> {
   if (!(await spendCoins(cost, count === 1 ? 'gacha_1' : 'gacha_10'))) return null;
 
   const state = await getGachaState();
-  let pity: PityState = { sr: state.sr, ssr: state.ssr };
+  let pity: PityState = { sr: state.sr, ssr: state.ssr, ur: state.ur };
   let rarities: Rarity[];
   if (count === 1) {
     const roll = rollRarity(Math.random, pity);
@@ -77,11 +82,13 @@ export async function pull(count: 1 | 10): Promise<PullResult[] | null> {
   // 重现每一抽之后的保底计数用于记录(逐抽重算)
   const perPullPity: PityState[] = [];
   {
-    let p: PityState = { sr: state.sr, ssr: state.ssr };
+    const high = (r: Rarity, tier: Rarity[]): boolean => tier.includes(r);
+    let p: PityState = { sr: state.sr, ssr: state.ssr, ur: state.ur };
     for (const r of rarities) {
       p = {
-        sr: r === 'SR' || r === 'SSR' ? 0 : p.sr + 1,
-        ssr: r === 'SSR' ? 0 : p.ssr + 1,
+        sr: high(r, ['SR', 'SSR', 'UR']) ? 0 : p.sr + 1,
+        ssr: high(r, ['SSR', 'UR']) ? 0 : p.ssr + 1,
+        ur: r === 'UR' ? 0 : p.ur + 1,
       };
       perPullPity.push(p);
     }

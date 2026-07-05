@@ -14,8 +14,11 @@ const STYLE_EXAMPLES: Record<string, string> = {
 };
 
 const SPECIES_NAMES: Record<string, string> = {
-  sp_cat: '小猫', sp_dog: '小狗', sp_rabbit: '兔子', sp_fox: '小狐狸',
-  sp_hamster: '仓鼠', sp_bird: '小鸟', sp_slime: '史莱姆', sp_dragon: '幼龙',
+  sp_cat: '小猫', sp_dog: '小狗', sp_rabbit: '兔子', sp_fox: '小狐狸', sp_hamster: '仓鼠',
+  sp_bird: '小鸟', sp_duck: '小鸭子', sp_hedgehog: '小刺猬', sp_panda: '熊猫',
+  sp_penguin: '小企鹅', sp_turtle: '小乌龟', sp_owl: '猫头鹰', sp_deer: '小鹿',
+  sp_slime: '史莱姆', sp_octopus: '小章鱼', sp_bat: '小蝙蝠', sp_dragon: '幼龙',
+  sp_ghost: '小幽灵', sp_unicorn: '独角兽', sp_phoenix: '凤凰雏鸟',
 };
 
 export interface PromptCtx {

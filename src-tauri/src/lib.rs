@@ -165,12 +165,21 @@ fn hit_test_loop(app: tauri::AppHandle) {
 }
 
 pub fn run() {
-    let migrations = vec![Migration {
-        version: 1,
-        description: "init schema",
-        sql: include_str!("../migrations/001_init.sql"),
-        kind: MigrationKind::Up,
-    }];
+    let migrations = vec![
+        Migration {
+            version: 1,
+            description: "init schema",
+            sql: include_str!("../migrations/001_init.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 2,
+            description: "add UR pity counters",
+            sql: "ALTER TABLE gacha_state ADD COLUMN pity_ur INTEGER NOT NULL DEFAULT 0;\n\
+                  ALTER TABLE gacha_log ADD COLUMN pity_ur_after INTEGER NOT NULL DEFAULT 0;",
+            kind: MigrationKind::Up,
+        },
+    ];
 
     tauri::Builder::default()
         .plugin(
