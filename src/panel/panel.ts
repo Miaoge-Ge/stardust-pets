@@ -80,6 +80,7 @@ async function renderSettings(): Promise<void> {
     (await getSetting('window_sense_enabled')) !== '0';
   ($('#proactiveToggle') as HTMLInputElement).checked =
     (await getSetting('proactive_enabled')) !== '0';
+  ($('#defaultCity') as HTMLInputElement).value = (await getSetting('default_city')) ?? '北京';
 }
 
 function currentCfgFromInputs() {
@@ -108,6 +109,10 @@ function bindSettings(): void {
   });
   $('#proactiveToggle').addEventListener('change', async (e) => {
     await setSetting('proactive_enabled', (e.target as HTMLInputElement).checked ? '1' : '0');
+  });
+  $('#defaultCity').addEventListener('change', async (e) => {
+    const v = (e.target as HTMLInputElement).value.trim();
+    await setSetting('default_city', v || '北京');
   });
 }
 

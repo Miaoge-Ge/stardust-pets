@@ -34,7 +34,9 @@ import {
   todayShorts,
 } from './systems/memory';
 import { initWindowSense, resetWorkTimer } from './systems/windowSense';
+import { checkDueReminders } from './systems/reminders';
 import { llmChat, llmConfigured, type ChatMsg } from './llm/client';
+import { tryHandleTool } from './llm/tools';
 import {
   buildChatSystem,
   buildCompressionMsgs,
@@ -420,6 +422,13 @@ async function promptCtx(query: string): Promise<PromptCtx> {
 }
 
 async function chatReply(text: string): Promise<string> {
+  // 天气/新闻/定时提醒:本地关键词识别,不依赖 LLM,命中即直接回复
+  const tool = await tryHandleTool(text, (await getSetting('default_city')) ?? '北京');
+  if (tool.handled && tool.reply) {
+    void addShortMemory(`主人问「${text.slice(0, 40)}」,${pet.name}用工具回复「${tool.reply.slice(0, 40)}」`);
+    return tool.reply;
+  }
+
   const ctx = await promptCtx(text);
   const messages: ChatMsg[] = [
     { role: 'system', content: buildChatSystem(ctx) },
@@ -678,9 +687,19 @@ async function boot(): Promise<void> {
     void invoke<number>('get_idle_seconds')
       .then((idle) => tickIdleEarning(idle))
       .then((earned) => {
-        if (earned) showSign('挂机奖励 +10⭐', 2500);
+        if (earned) showSign('挂机奖励 +15⭐', 2500);
       })
       .catch(() => {});
+  }, 60_000);
+
+  // 定时提醒:每分钟检查到期项,弹桌面通知 + 宠物举牌
+  setInterval(() => {
+    void checkDueReminders().then((due) => {
+      if (due.length === 0) return;
+      markInteract();
+      machine.interrupt('hold_sign', true);
+      showSign(`⏰ ${due[0].message}`, 8000);
+    });
   }, 60_000);
 
   // 问候 / 首次隐私说明 / 签到

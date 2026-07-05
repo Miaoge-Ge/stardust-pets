@@ -125,6 +125,99 @@ async fn llm_chat(
         .ok_or_else(|| "empty response".to_string())
 }
 
+/// 天气查询:wttr.in 免费文本接口,不需要 API Key。
+#[tauri::command]
+async fn fetch_weather(city: String) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let encoded = urlencoding_lite(&city);
+    let url = format!("https://wttr.in/{encoded}?format=3&lang=zh");
+    let resp = client
+        .get(&url)
+        .header("User-Agent", "curl/8.0")
+        .send()
+        .await
+        .map_err(|e| format!("network: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("api status {}", resp.status()));
+    }
+    let text = resp.text().await.map_err(|e| e.to_string())?;
+    let text = text.trim().to_string();
+    if text.is_empty() || text.to_lowercase().contains("unknown location") {
+        return Err("城市未识别".to_string());
+    }
+    Ok(text)
+}
+
+/// 新闻头条:Google News RSS(公开只读端点,不需要 API Key),提取前 N 条标题。
+#[tauri::command]
+async fn fetch_news() -> Result<Vec<String>, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let url = "https://news.google.com/rss?hl=zh-CN&gl=CN&ceid=CN:zh-Hans";
+    let resp = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| format!("network: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("api status {}", resp.status()));
+    }
+    let xml = resp.text().await.map_err(|e| e.to_string())?;
+    let titles = extract_rss_titles(&xml, 5);
+    if titles.is_empty() {
+        return Err("未获取到新闻".to_string());
+    }
+    Ok(titles)
+}
+
+fn extract_rss_titles(xml: &str, limit: usize) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut rest = xml;
+    // 跳过 RSS 频道本身的 <title>(第一个),只取 <item> 内的标题
+    if let Some(first_item) = rest.find("<item>") {
+        rest = &rest[first_item..];
+    }
+    while out.len() < limit {
+        let Some(start) = rest.find("<title>") else { break };
+        let after = &rest[start + "<title>".len()..];
+        let Some(end) = after.find("</title>") else { break };
+        let raw = &after[..end];
+        let cleaned = raw
+            .replace("<![CDATA[", "")
+            .replace("]]>", "")
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'");
+        let cleaned = cleaned.trim().to_string();
+        if !cleaned.is_empty() {
+            out.push(cleaned);
+        }
+        rest = &after[end..];
+    }
+    out
+}
+
+/// 极简 URL 编码(城市名通常只含 ASCII/中文,足够覆盖常见输入)
+fn urlencoding_lite(s: &str) -> String {
+    let mut out = String::new();
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
+            _ => out.push_str(&format!("%{:02X}", b)),
+        }
+    }
+    out
+}
+
 fn hit_test_loop(app: tauri::AppHandle) {
     let mut last_ignore: Option<bool> = None;
     loop {
@@ -187,13 +280,16 @@ pub fn run() {
                 .add_migrations("sqlite:stardust.db", migrations)
                 .build(),
         )
+        .plugin(tauri_plugin_notification::init())
         .manage(HitState(Mutex::new(Hitbox::default())))
         .invoke_handler(tauri::generate_handler![
             update_hitbox,
             get_active_window_info,
             quit_app,
             get_idle_seconds,
-            llm_chat
+            llm_chat,
+            fetch_weather,
+            fetch_news
         ])
         .setup(|app| {
             let handle = app.handle().clone();
