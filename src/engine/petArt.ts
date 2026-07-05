@@ -7,7 +7,7 @@
  *          → 物种特征 → 五官 → 配饰 → 状态图标 → 发光特效
  */
 import type { Colors } from '../gen/generator';
-import { GRID, Mask, haloMask, outlineMask, paintMask, px } from './pixel';
+import { GRID, Mask, haloMask, outlineMask, paintMask, px, scale2x } from './pixel';
 
 export interface Look {
   species: string;
@@ -325,12 +325,17 @@ function buildSilhouette(m: Mask, look: Look, p: FP): { a: Anchors; tailPts: Arr
         m.rect(18, 38 + b, 2, 45 - (38 + b) + 1);
         m.rect(26, 38 + b, 2, 45 - (38 + b) + 1);
       } else {
+        // 8 相步态(含半抬腿过渡帧),行走更连贯
         const lifts = [
           [2, 0, 0, 2],
+          [1, 0, 0, 1],
           [0, 0, 0, 0],
+          [0, 1, 1, 0],
           [0, 2, 2, 0],
+          [0, 1, 1, 0],
           [0, 0, 0, 0],
-        ][phase];
+          [1, 0, 0, 1],
+        ][(p.legPhase ?? 1) % 8];
         const legX = [12, 17, 26, 31];
         for (let i = 0; i < 4; i++) m.rect(legX[i], 36 + b, 3, 45 - (36 + b) - lifts[i] + 1);
       }
@@ -435,11 +440,14 @@ function buildSilhouette(m: Mask, look: Look, p: FP): { a: Anchors; tailPts: Arr
 // ---------------------------------------------------------------- 着色/花纹/材质
 
 function shadingPass(ctx: CanvasRenderingContext2D, m: Mask, c: Colors): void {
+  // 双层着色:近底暗部两档 + 顶部高光,体积感更强
+  const deep = blend(c.shade, c.outline);
   for (let y = 0; y < GRID; y++) {
     for (let x = 0; x < GRID; x++) {
-      if (!m.get(x, y)) continue;
-      if (!m.get(x, y + 2) && !m.isEdge(x, y)) px(ctx, x, y, c.shade);
-      else if (!m.get(x, y - 2) && y < 26 && !m.isEdge(x, y)) px(ctx, x, y, c.light);
+      if (!m.get(x, y) || m.isEdge(x, y)) continue;
+      if (!m.get(x, y + 1)) px(ctx, x, y, deep);
+      else if (!m.get(x, y + 3)) px(ctx, x, y, c.shade);
+      else if (!m.get(x, y - 2) && y < 26) px(ctx, x, y, c.light);
     }
   }
 }
@@ -1009,7 +1017,7 @@ function drawExtras(ctx: CanvasRenderingContext2D, a: Anchors, p: FP): void {
 
 // ---------------------------------------------------------------- 主入口
 
-export function drawPetFrame(look: Look, p: FP): HTMLCanvasElement {
+function drawBase(look: Look, p: FP): { canvas: HTMLCanvasElement; a: Anchors } {
   const canvas = document.createElement('canvas');
   canvas.width = GRID;
   canvas.height = GRID;
@@ -1057,11 +1065,91 @@ export function drawPetFrame(look: Look, p: FP): HTMLCanvasElement {
   }
 
   drawExtras(ctx, a, p);
-  return canvas;
+  return { canvas, a };
 }
 
 function paintBelly(ctx: CanvasRenderingContext2D, m: Mask, c: Colors, cx: number, cy: number, rx: number, ry: number): void {
   for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++)
     for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++)
       if (inBlob(x, y, cx, cy, rx, ry) && m.get(x, y) && !m.isEdge(x, y)) px(ctx, x, y, c.belly);
+}
+
+// ---------------------------------------------------------------- 96px 精修细节层
+
+const WHISKER_SPECIES = ['sp_cat', 'sp_fox', 'sp_rabbit', 'sp_hamster', 'sp_dog'];
+const REFINED_EYES = ['eye_round', 'eye_almond', 'eye_button', 'eye_hetero'];
+
+/**
+ * 在 2× 中间分辨率(96px)上补画基底网格画不出的细节:
+ * 圆角大眼 + 双高光 + 虹膜色、胡须、腮红柔边、绒毛胸口纹理。
+ * 之后再经一次 Scale2x → 192px,细节精度是基底的两倍。
+ */
+function fineDetailPass(ctx: CanvasRenderingContext2D, look: Look, a: Anchors, p: FP): void {
+  if (!a.face || p.pose === 'curl' || p.pose === 'back') return;
+  const c = look.colors;
+  const spec = specOf(look);
+  const hx = a.hx * 2;
+  const hy = a.hy * 2;
+  const ey = (a.hy - 1) * 2;
+
+  const eyeState = p.eye ?? 'open';
+  if (eyeState === 'open' && REFINED_EYES.includes(look.eyes)) {
+    const drawEye = (x: number, right: boolean): void => {
+      // 圆角眼眶(覆盖基底方块眼)
+      ctx.fillStyle = UI.eye;
+      ctx.fillRect(x + 1, ey - 2, 2, 1);
+      ctx.fillRect(x, ey - 1, 4, 5);
+      ctx.fillRect(x + 1, ey + 4, 2, 1);
+      // 虹膜(异瞳左右异色)
+      const iris =
+        look.eyes === 'eye_hetero' ? (right ? c.accent : c.pattern) : blend(c.accent, UI.eye);
+      ctx.fillStyle = iris;
+      ctx.fillRect(x + 1, ey + 2, 2, 2);
+      // 双高光
+      ctx.fillStyle = UI.white;
+      ctx.fillRect(x, ey - 1, 2, 2);
+      ctx.globalAlpha = 0.7;
+      ctx.fillRect(x + 3, ey + 3, 1, 1);
+      ctx.globalAlpha = 1;
+    };
+    drawEye((a.hx - 5) * 2, false);
+    drawEye((a.hx + 3) * 2, true);
+  }
+
+  if (spec.kind === 'quad' && WHISKER_SPECIES.includes(look.species)) {
+    ctx.fillStyle = c.outline;
+    ctx.globalAlpha = 0.5;
+    ctx.fillRect(hx - 17, hy + 5, 5, 1);
+    ctx.fillRect(hx - 16, hy + 8, 4, 1);
+    ctx.fillRect(hx + 12, hy + 5, 5, 1);
+    ctx.fillRect(hx + 12, hy + 8, 4, 1);
+    ctx.globalAlpha = 1;
+  }
+
+  if (p.blush) {
+    // 腮红柔边(在基底腮红外圈补一层半透明)
+    ctx.fillStyle = UI.blushC;
+    ctx.globalAlpha = 0.35;
+    ctx.fillRect((a.hx - 8) * 2 - 1, (a.hy + 2) * 2 - 1, 6, 4);
+    ctx.fillRect((a.hx + 6) * 2 - 1, (a.hy + 2) * 2 - 1, 6, 4);
+    ctx.globalAlpha = 1;
+  }
+
+  if (look.material === 'mat_fur' && (p.pose === 'sit' || p.pose === 'stand')) {
+    // 胸口绒毛小锯齿
+    ctx.fillStyle = c.belly;
+    const cx0 = a.nx * 2;
+    const cy0 = a.ny * 2 + 6;
+    ctx.fillRect(cx0 - 4, cy0, 1, 2);
+    ctx.fillRect(cx0 - 1, cy0 + 1, 1, 2);
+    ctx.fillRect(cx0 + 2, cy0, 1, 2);
+  }
+}
+
+/** 完整渲染管线:48 基底 → 2×(96,精修细节)→ 2×(192) */
+export function renderFrame(look: Look, p: FP): HTMLCanvasElement {
+  const { canvas, a } = drawBase(look, p);
+  const mid = scale2x(canvas);
+  fineDetailPass(mid.getContext('2d')!, look, a, p);
+  return scale2x(mid);
 }

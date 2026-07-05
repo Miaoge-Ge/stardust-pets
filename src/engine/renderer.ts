@@ -178,9 +178,16 @@ function hueToRgb(h: number): number {
   return (f(0) << 16) | (f(8) << 8) | f(4);
 }
 
+/** 切换这些状态之间时不做挤压过渡(移动的连续性) */
+const LOCO = new Set(['walk', 'run', 'jump']);
+const TRANS_MS = 240;
+const GHOST_MS = 150;
+
 export class PetView {
   app: Application;
   sprite!: Sprite;
+  /** 上一动作的残影,交叉淡出让切换不生硬 */
+  ghost!: Sprite;
   shadow!: Graphics;
   effects = new EffectLayer();
   sets: Record<string, Texture[]> = {};
@@ -189,6 +196,9 @@ export class PetView {
   dir: 1 | -1 = 1;
   private acc = 0;
   private idx = 0;
+  private transT = TRANS_MS; // 挤压过渡计时(≥TRANS_MS 表示结束)
+  private ghostT = GHOST_MS;
+  private breathT = 0;
 
   static async create(container: HTMLElement, look: Look): Promise<PetView> {
     const app = new Application();
@@ -213,6 +223,13 @@ export class PetView {
     this.shadow.ellipse(0, 0, 23, 5).fill({ color: 0x000000, alpha: 0.18 });
     this.shadow.position.set(PET_X, PET_FOOT_Y + 3);
     app.stage.addChild(this.shadow);
+
+    this.ghost = new Sprite();
+    this.ghost.anchor.set(0.5, 1);
+    this.ghost.position.set(PET_X, PET_FOOT_Y);
+    this.ghost.scale.set(K);
+    this.ghost.alpha = 0;
+    app.stage.addChild(this.ghost);
 
     this.sprite = new Sprite();
     this.sprite.anchor.set(0.5, 1);
@@ -253,17 +270,26 @@ export class PetView {
       this.fps = fps;
       return;
     }
+    const smooth = !(LOCO.has(this.key) && LOCO.has(key));
+    // 残影交叉淡出
+    this.ghost.texture = this.sprite.texture;
+    this.ghost.scale.x = K * this.dir;
+    this.ghost.scale.y = K;
+    this.ghost.alpha = 0.7;
+    this.ghostT = 0;
+    // 挤压-拉伸缓冲(移动状态之间跳过,保持步态连续)
+    if (smooth) this.transT = 0;
+
     this.key = key;
     this.fps = fps;
     this.idx = 0;
     this.acc = 0;
     this.sprite.texture = this.sets[key][0];
-    this.effects.moving = key === 'walk' || key === 'run' || key === 'jump';
+    this.effects.moving = LOCO.has(key);
   }
 
   setFlip(dir: 1 | -1): void {
     this.dir = dir;
-    this.sprite.scale.x = K * dir;
   }
 
   setShadowVisible(v: boolean): void {
@@ -286,6 +312,33 @@ export class PetView {
       }
       this.sprite.texture = frames[this.idx];
     }
+
+    // 残影淡出
+    if (this.ghostT < GHOST_MS) {
+      this.ghostT += ms;
+      this.ghost.alpha = Math.max(0, 0.7 * (1 - this.ghostT / GHOST_MS));
+    } else if (this.ghost.alpha > 0) {
+      this.ghost.alpha = 0;
+    }
+
+    // 挤压-拉伸过渡包络:轻压 → 回弹 → 归位
+    let sx = 1;
+    let sy = 1;
+    if (this.transT < TRANS_MS) {
+      this.transT += ms;
+      const t = Math.min(1, this.transT / TRANS_MS);
+      const wobble = Math.sin(t * Math.PI * 2) * (1 - t);
+      sy = 1 - 0.09 * wobble;
+      sx = 1 + 0.07 * wobble;
+    }
+
+    // 持续呼吸(所有状态之上叠加的微幅起伏,让宠物始终是"活"的)
+    this.breathT += ms;
+    const breath = 1 + 0.012 * Math.sin(this.breathT / 420);
+
+    this.sprite.scale.x = K * this.dir * sx;
+    this.sprite.scale.y = K * sy * breath;
+
     this.effects.tick(ms);
   }
 }

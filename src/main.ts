@@ -96,6 +96,8 @@ let overlayActive = false;
 let savedPos = '';
 
 let climbTarget: { x: number; y: number; title: string; wx: number; wy: number } | null = null;
+let descending = false;
+let descendV = 0;
 
 // ---------------------------------------------------------------- 窗口移动
 
@@ -193,7 +195,13 @@ const host: Host = {
   },
 
   descendStep(dtMs) {
-    const vStep = (520 * scale * dtMs) / 1000;
+    // 重力弧线:下落逐渐加速,比匀速下滑自然得多
+    if (!descending) {
+      descending = true;
+      descendV = 140 * scale;
+    }
+    descendV = Math.min(descendV + (1500 * scale * dtMs) / 1000, 760 * scale);
+    const vStep = (descendV * dtMs) / 1000;
     const hStep = (240 * scale * dtMs) / 1000;
     let arrived = true;
     if (Math.abs(posY - groundY) > 3) {
@@ -209,6 +217,7 @@ const host: Host = {
     if (arrived) {
       setPos(groundX, groundY);
       climbTarget = null;
+      descending = false;
     }
     return arrived;
   },

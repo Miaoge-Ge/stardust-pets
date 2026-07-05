@@ -20,6 +20,11 @@ Built with Tauri 2 (Rust) + TypeScript + PixiJS · Local SQLite · Privacy-first
 - Transparent, frameless, always-on-top window; **only the pet itself captures the mouse** — clicks around it pass straight through to your desktop
 - 22 FSM-driven actions: sit / lie / sleep / groom / chase tail / wander / **climb up and sit on the top edge of your active window** / struggle when dragged / sulk with its back turned…
 - Pat it and it squints and blushes; triple-click and it jumps with joy; poke it while asleep and it startles awake first
+- **Natural, elegant transitions**: cross-fade ghost between animations, squash-stretch rebound on state changes, eased acceleration/deceleration for walk/run, a brief pause before turning at screen edges, gravity-arc acceleration when dropping down from a climb, and continuous subtle breathing even at rest — nothing snaps instantly
+
+### 🎨 Refined pixel art
+- 48px base → an intermediate 96px pass redraws rounded eyes (dual highlights + iris color), whiskers, softened blush, and chest-fur texture → upscaled to 192px, then linearly downsampled to 88px on screen — no more mosaic edges
+- 8-phase walk/run gait (with half-lift transition frames) and dual-tone body shading for more volume
 
 ### 🎰 Hundreds of millions of collectible forms
 - **11 part dimensions**: **20 species** (cat / dog / rabbit / fox / hamster / bird / duck / hedgehog / panda / penguin / turtle / owl / deer / slime / octopus / bat / baby dragon / ghost / unicorn / phoenix) × body type × material (fur / translucent jelly / scales / stardust) × ears × tail × eyes × mouth × 13 coat patterns × procedural palettes × headwear × neckwear — 100M+ discrete combos, and palette jitter makes each pet practically unique

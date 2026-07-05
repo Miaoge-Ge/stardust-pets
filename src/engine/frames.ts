@@ -1,10 +1,15 @@
 /** 动作帧参数表(与形态解耦):buildFrameSets(look) 为任意部件组合生成全套动作帧 */
 import type { Colors } from '../gen/generator';
-import { GRID, upscale4x } from './pixel';
-import { drawPetFrame, type FP, type Look } from './petArt';
+import { GRID } from './pixel';
+import { renderFrame, type FP, type Look } from './petArt';
 
-/** 贴图尺寸:48 基底 → Scale2x×2 = 192,渲染层再线性缩到展示尺寸(消除马赛克) */
+/** 贴图尺寸:48 基底 → 2×(96 精修)→ 2× = 192,渲染层线性缩到展示尺寸 */
 export const TEX_SIZE = GRID * 4;
+
+/** 平滑正弦序列工具:生成 n 帧 0→1→0 的呼吸曲线 */
+function breathe(n: number): number[] {
+  return Array.from({ length: n }, (_, i) => (1 - Math.cos((i / n) * Math.PI * 2)) / 2);
+}
 
 function sit(over: Partial<FP> = {}): FP {
   return { pose: 'sit', ...over };
@@ -13,18 +18,19 @@ function sit(over: Partial<FP> = {}): FP {
 function buildLists(): Record<string, FP[]> {
   const lists: Record<string, FP[]> = {};
 
-  const sq = [0, 0.4, 0.8, 0.4, 0, 0.4];
-  const tw = [-0.4, -0.1, 0.3, 0.5, 0.2, -0.1];
+  // 8 帧正弦呼吸 + 尾巴连续摆动,待机更柔和
+  const sq8 = breathe(8).map((v) => v * 0.9);
+  const tw8 = breathe(8).map((v, i) => -0.4 + v * 0.9 + (i % 2) * 0.05);
 
-  lists.sit = sq.map((s, i) =>
-    sit({ squash: s, tail: tw[i], eye: i === 4 ? 'closed' : 'open' })
+  lists.sit = sq8.map((s, i) =>
+    sit({ squash: s, tail: tw8[i], eye: i === 6 ? 'closed' : 'open' })
   );
 
-  lists.lie = sq.map((s, i) => ({
+  lists.lie = sq8.map((s, i) => ({
     pose: 'lie' as const,
     squash: s * 0.6,
-    tail: tw[i],
-    eye: i === 4 ? 'closed' : 'half',
+    tail: tw8[i],
+    eye: i === 6 ? 'closed' : 'half',
     mouth: 'none' as const,
   }));
 
@@ -72,20 +78,22 @@ function buildLists(): Record<string, FP[]> {
     eye: 'closed' as const,
   }));
 
-  lists.walk = [0, 1, 2, 3].map((ph) => ({
+  // 8 相步态:半抬腿过渡帧 + 正弦身体起伏
+  const bob8 = breathe(8);
+  lists.walk = [0, 1, 2, 3, 4, 5, 6, 7].map((ph) => ({
     pose: 'stand' as const,
     legPhase: ph,
-    bob: ph % 2 === 0 ? 0 : -1,
-    tail: ph % 2 === 0 ? 0.2 : 0.35,
+    bob: -bob8[ph],
+    tail: 0.2 + bob8[ph] * 0.2,
   }));
 
-  lists.run = [0, 1, 2, 3].map((ph) => ({
+  lists.run = [0, 1, 2, 3, 4, 5, 6, 7].map((ph) => ({
     pose: 'stand' as const,
     legPhase: ph,
-    bob: ph % 2 === 0 ? -1 : -2,
+    bob: -1 - bob8[ph] * 1.2,
     earFlat: true,
-    tail: -0.8,
-    dust: ph % 2 === 0,
+    tail: -0.8 + bob8[ph] * 0.15,
+    dust: ph % 4 === 0,
   }));
 
   lists.jump = [0, -1].map((b) => ({
@@ -169,14 +177,14 @@ const LISTS = buildLists();
 export function buildFrameSets(look: Look): Record<string, HTMLCanvasElement[]> {
   const out: Record<string, HTMLCanvasElement[]> = {};
   for (const [key, frames] of Object.entries(LISTS)) {
-    out[key] = frames.map((fp, i) => upscale4x(drawPetFrame(look, { ...fp, frameIdx: i })));
+    out[key] = frames.map((fp, i) => renderFrame(look, { ...fp, frameIdx: i }));
   }
   return out;
 }
 
-/** 单帧立绘(图鉴/抽卡结算用):坐姿第 1 帧,已平滑放大 */
+/** 单帧立绘(图鉴/抽卡结算用):坐姿第 1 帧,已精修放大 */
 export function drawPortrait(look: Look): HTMLCanvasElement {
-  return upscale4x(drawPetFrame(look, { pose: 'sit', eye: 'open', tail: 0.3, frameIdx: 0 }));
+  return renderFrame(look, { pose: 'sit', eye: 'open', tail: 0.3, frameIdx: 0 });
 }
 
 /** 兼容旧存档(一期占位宠物)与生成器输出 → Look */

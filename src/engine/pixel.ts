@@ -145,10 +145,6 @@ export function scale2x(src: HTMLCanvasElement): HTMLCanvasElement {
   return out;
 }
 
-export function upscale4x(src: HTMLCanvasElement): HTMLCanvasElement {
-  return scale2x(scale2x(src));
-}
-
 /** 沿 mask 外侧画一圈光晕(发光描边特效) */
 export function haloMask(ctx: CanvasRenderingContext2D, m: Mask, color: string, alpha: number): void {
   ctx.fillStyle = color;

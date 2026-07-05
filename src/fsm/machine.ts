@@ -19,16 +19,16 @@ export interface StateDef {
 }
 
 export const DEFS: Record<StateName, StateDef> = {
-  sit:          { anim: 'sit',     fps: 5,  minMs: 4000,  maxMs: 8000,  interruptible: true, idleWeight: 3 },
-  lie:          { anim: 'lie',     fps: 4,  minMs: 5000,  maxMs: 10000, interruptible: true, idleWeight: 2.5 },
+  sit:          { anim: 'sit',     fps: 6,  minMs: 4000,  maxMs: 8000,  interruptible: true, idleWeight: 3 },
+  lie:          { anim: 'lie',     fps: 5,  minMs: 5000,  maxMs: 10000, interruptible: true, idleWeight: 2.5 },
   sleep:        { anim: 'sleep',   fps: 3,  minMs: 12000, maxMs: 25000, interruptible: true, idleWeight: 1.5 },
   daze:         { anim: 'daze',    fps: 3,  minMs: 3000,  maxMs: 6000,  interruptible: true, idleWeight: 1.5 },
   yawn:         { anim: 'yawn',    fps: 6,  minMs: 1000,  maxMs: 1000,  interruptible: false, idleWeight: 1 },
   groom:        { anim: 'groom',   fps: 5,  minMs: 3000,  maxMs: 6000,  interruptible: true, idleWeight: 1.5 },
   tail_chase:   { anim: 'tail_chase', fps: 8, minMs: 2500, maxMs: 4000, interruptible: true, idleWeight: 1 },
   stretch:      { anim: 'stretch', fps: 5,  minMs: 900,   maxMs: 900,   interruptible: false, idleWeight: 1 },
-  walk:         { anim: 'walk',    fps: 7,  minMs: 2000,  maxMs: 5000,  interruptible: true },
-  run:          { anim: 'run',     fps: 10, minMs: 1000,  maxMs: 2500,  interruptible: true },
+  walk:         { anim: 'walk',    fps: 10, minMs: 2000,  maxMs: 5000,  interruptible: true },
+  run:          { anim: 'run',     fps: 14, minMs: 1200,  maxMs: 2800,  interruptible: true },
   climb_window: { anim: 'jump',    fps: 6,  minMs: 12000, maxMs: 12000, interruptible: false },
   sit_on_window:{ anim: 'sit',     fps: 5,  minMs: 10000, maxMs: 25000, interruptible: true },
   jump_down:    { anim: 'jump',    fps: 8,  minMs: 8000,  maxMs: 8000,  interruptible: false },
@@ -85,6 +85,15 @@ export class Machine {
   private lastSulkAt = 0;
   private checkTimer = 0;
   private deciding = false;
+  private turnPauseMs = 0;
+
+  /** 移动速度包络:起步加速、停步减速(自然的匀加/减速而非瞬时启停) */
+  private moveEnvelope(): number {
+    const ramp = 350;
+    const inFactor = Math.min(1, this.elapsed / ramp);
+    const outFactor = Math.min(1, Math.max(0, (this.duration - this.elapsed) / ramp));
+    return 0.15 + 0.85 * Math.min(inFactor, outFactor) ** 1.4;
+  }
 
   constructor(private host: Host) {}
 
@@ -103,6 +112,7 @@ export class Machine {
     if (name === 'walk' || name === 'run') {
       this.walkDir = Math.random() < 0.5 ? 1 : -1;
       this.host.setFlip(this.walkDir);
+      this.turnPauseMs = 0;
     }
     if (name === 'sit_on_window') this.checkTimer = 0;
   }
@@ -146,17 +156,19 @@ export class Machine {
     const def = DEFS[this.current];
 
     switch (this.current) {
-      case 'walk': {
-        if (this.host.moveBy((this.walkDir * 55 * dtMs) / 1000) === 'edge') {
-          this.walkDir = this.walkDir === 1 ? -1 : 1;
-          this.host.setFlip(this.walkDir);
-        }
-        break;
-      }
+      case 'walk':
       case 'run': {
-        if (this.host.moveBy((this.walkDir * 150 * dtMs) / 1000) === 'edge') {
+        // 撞到屏幕边缘:先停一拍再掉头,而不是瞬间镜像
+        if (this.turnPauseMs > 0) {
+          this.turnPauseMs -= dtMs;
+          break;
+        }
+        const base = this.current === 'walk' ? 55 : 150;
+        const v = base * this.moveEnvelope();
+        if (this.host.moveBy((this.walkDir * v * dtMs) / 1000) === 'edge') {
           this.walkDir = this.walkDir === 1 ? -1 : 1;
           this.host.setFlip(this.walkDir);
+          this.turnPauseMs = 150;
         }
         break;
       }
