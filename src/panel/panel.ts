@@ -1,7 +1,7 @@
 /** 面板窗口:抽卡 / 图鉴(我的宠物·部件图鉴·成就)/ 商店 */
 import { emit, listen } from '@tauri-apps/api/event';
 
-import { drawPortrait, lookFromParts } from '../engine/frames';
+import { lookFromParts, renderPortrait } from '../engine/look';
 import {
   ALL_EFFECTS,
   ALL_PARTS,
@@ -16,6 +16,7 @@ import {
 import { initDb, getSetting, setSetting } from '../systems/db';
 import { addCoins, getBalance, getShards, shardsToCoins, type CoinEvent } from '../systems/currency';
 import { loadLlmConfig, llmTest, saveLlmConfig } from '../llm/client';
+import { buyShopItem, getRemainingToday, SHOP_ITEMS } from '../systems/shop';
 import { getGachaState, getLogs, pull, wishCraft, type PullResult } from '../systems/gacha';
 import {
   listPets,
@@ -50,9 +51,9 @@ async function refreshWallet(): Promise<void> {
   $('#shards').textContent = String(await getShards());
 }
 
-function portraitCanvas(pet: PetRecord): HTMLCanvasElement {
+function portraitCanvas(pet: PetRecord): HTMLElement {
   const look = lookFromParts(pet.parts.ids, pet.parts.effects, pet.parts.colors);
-  return drawPortrait(look);
+  return renderPortrait(look);
 }
 
 function switchTab(tab: string): void {
@@ -464,9 +465,54 @@ function fillWishSpecies(): void {
   }
 }
 
+async function renderIntimacyItems(): Promise<void> {
+  const box = $('#intimacyItems');
+  box.innerHTML = '';
+  const activeId = await getSetting('active_pet_id');
+  for (const item of SHOP_ITEMS) {
+    const remaining = await getRemainingToday(item.id);
+    const owned = item.id === 'collar' && activeId && (await getSetting(`shop_owned_${item.id}_${activeId}`)) === '1';
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    const btn = document.createElement('button');
+    if (owned) {
+      btn.textContent = '已拥有';
+      btn.disabled = true;
+    } else if (remaining <= 0) {
+      btn.textContent = '今日已购完';
+      btn.disabled = true;
+    } else {
+      btn.className = 'primary';
+      btn.textContent = `购买 ⭐${item.cost}`;
+      btn.addEventListener('click', async () => {
+        if (!activeId) return;
+        const r = await buyShopItem(item.id, activeId);
+        if (!r.ok) {
+          if (r.reason === 'coins') alert('星星币不足');
+          else if (r.reason === 'limit') alert('今日已达购买上限');
+          return;
+        }
+        await refreshWallet();
+        await renderIntimacyItems();
+        void emit('shop-purchase', { gain: r.gain, triggerState: r.triggerState });
+      });
+    }
+    card.innerHTML = `<div class="nm">${item.name}</div><div class="desc">${item.desc}<br/>+${item.intimacy} 亲密度</div>`;
+    card.appendChild(btn);
+    if (!owned) {
+      const left = document.createElement('div');
+      left.className = 'left';
+      left.textContent = `今日剩余 ${remaining}/${item.dailyLimit}`;
+      card.appendChild(left);
+    }
+    box.appendChild(card);
+  }
+}
+
 async function renderShop(): Promise<void> {
   await refreshWallet();
   fillWishSpecies();
+  await renderIntimacyItems();
 }
 
 // ---------------------------------------------------------------- 启动

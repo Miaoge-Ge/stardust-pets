@@ -4,9 +4,8 @@ import { emit, listen } from '@tauri-apps/api/event';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { currentMonitor, getCurrentWindow, primaryMonitor } from '@tauri-apps/api/window';
 
-import { lookFromParts } from './engine/frames';
-import type { Look } from './engine/petArt';
-import { PetView, PET_FOOT_Y } from './engine/renderer';
+import { lookFromParts, type Look } from './engine/look';
+import { PetView, PET_FOOT_Y, PET_SIZE, PET_X } from './engine/renderer';
 import { DEFS, Machine, type Host, type StateName } from './fsm/machine';
 import { bumpDaily, getDb, getSetting, initDb, setSetting } from './systems/db';
 import {
@@ -123,8 +122,13 @@ function feetPhys(): number {
 
 function reportHitbox(): void {
   const full = overlayActive || dragging;
-  // 宠物缩小到 88px 后的包围盒(含少量余量)
-  void invoke('update_hitbox', { x: 78, y: 184, w: 104, h: 102, full });
+  void invoke('update_hitbox', {
+    x: PET_X - PET_SIZE / 2,
+    y: PET_FOOT_Y - PET_SIZE,
+    w: PET_SIZE,
+    h: PET_SIZE,
+    full,
+  });
 }
 
 // ---------------------------------------------------------------- FSM Host
@@ -636,10 +640,15 @@ async function boot(): Promise<void> {
   setupInput();
   reportHitbox();
 
-  view.app.ticker.add((ticker) => {
-    machine.tick(ticker.deltaMS);
-    view.tick(ticker.deltaMS);
-  });
+  let lastFrame = performance.now();
+  function frameLoop(now: number): void {
+    const dt = Math.min(100, now - lastFrame); // 钳位避免切后台恢复时的巨大跳变
+    lastFrame = now;
+    machine.tick(dt);
+    view.tick(dt);
+    requestAnimationFrame(frameLoop);
+  }
+  requestAnimationFrame(frameLoop);
 
   setInterval(() => void savePosition(), 30_000);
   window.addEventListener('beforeunload', () => void savePosition());
@@ -657,6 +666,11 @@ async function boot(): Promise<void> {
     view.setLook(buildLook(pet));
     machine.interrupt('click_happy', true);
     showSign(`${pet.name} 登场!`, 3000);
+  });
+  void listen<{ gain?: IntimacyGain; triggerState?: string }>('shop-purchase', async (e) => {
+    markInteract();
+    if (e.payload.triggerState) machine.interrupt(e.payload.triggerState as StateName, true);
+    if (e.payload.gain) await handleGain(e.payload.gain);
   });
 
   // 挂机计时:每分钟一跳,空闲(≥30 分钟无输入)暂停

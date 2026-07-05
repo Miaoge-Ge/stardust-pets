@@ -75,7 +75,7 @@
       background: var(--card); border: 2px solid var(--n); border-radius: 10px;
       padding: 8px; text-align: center; position: relative;
     }
-    .card img, .card canvas { width: 96px; height: 96px; }
+    .card img, .card canvas, .card .pet-portrait { width: 96px; height: 96px; margin: 0 auto; }
     .card .nm { font-size: 12px; margin-top: 4px; }
     .card .rar { font-size: 11px; font-weight: 700; }
     .card.N { border-color: var(--n); }   .card.N .rar { color: var(--n); }
@@ -183,7 +183,7 @@
       background: var(--card); border: 1px solid var(--line); border-radius: 14px;
       padding: 20px; width: 340px; text-align: center;
     }
-    #detail canvas { width: 144px; height: 144px; }
+    #detail canvas, #detail .pet-portrait { width: 144px; height: 144px; margin: 0 auto; }
     #detail .meta { font-size: 12px; color: var(--dim); margin: 8px 0; line-height: 1.8; }
     #detail .row { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
 
@@ -192,6 +192,14 @@
     .shop-block h3 { font-size: 14px; margin-bottom: 10px; }
     .shop-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .hint { color: var(--dim); font-size: 11px; margin-top: 6px; }
+    .item-card {
+      background: var(--card2); border: 1px solid var(--line); border-radius: 8px;
+      padding: 10px; width: 130px; text-align: center;
+    }
+    .item-card .nm { font-size: 13px; font-weight: 600; }
+    .item-card .desc { font-size: 11px; color: var(--dim); margin: 4px 0 8px; min-height: 28px; }
+    .item-card .cost { font-size: 12px; color: var(--accent); margin-bottom: 6px; }
+    .item-card .left { font-size: 10px; color: var(--dim); margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -249,6 +257,11 @@
     </div>
 
     <div class="page" id="page-shop">
+      <div class="shop-block">
+        <h3>❤️ 亲密度道具</h3>
+        <div class="shop-row" id="intimacyItems" style="align-items:stretch;flex-wrap:wrap;"></div>
+        <div class="hint">每日限购,给攒不够互动次数的时候一个补充路径;精美项圈每只宠物限购一次。</div>
+      </div>
       <div class="shop-block">
         <h3>🧩 碎片兑换星星币</h3>
         <div class="shop-row">

@@ -125,9 +125,9 @@ export async function dailyCheckin(): Promise<CheckinResult | null> {
 
 // ---------------------------------------------------------------- 每日互动任务
 
-const TASK_TARGETS: Record<string, number> = { pet_count: 5, feed_count: 1, chat_count: 1 };
+const TASK_TARGETS: Record<string, number> = { pet_count: 3, feed_count: 1, chat_count: 1 };
 const TASK_NAMES: Record<string, string> = {
-  pet_count: '摸头 5 次',
+  pet_count: '摸头 3 次',
   feed_count: '喂食 1 次',
   chat_count: '聊天 1 次',
 };
@@ -139,7 +139,7 @@ const TASK_NAMES: Record<string, string> = {
 export async function maybeTaskReward(field: string, newCount: number): Promise<string | null> {
   const target = TASK_TARGETS[field];
   if (!target || newCount !== target) return null;
-  await addCoins(10, `task_${field}`);
+  await addCoins(15, `task_${field}`);
   return TASK_NAMES[field];
 }
 
@@ -147,14 +147,14 @@ export async function maybeTaskReward(field: string, newCount: number): Promise<
 
 /**
  * 每分钟由宠物窗口调用一次;空闲(≥30 分钟无键鼠)时不累计。
- * 满 60 活跃分钟 → +10,进度持久化,崩溃不丢。
+ * 满 20 活跃分钟 → +15(原为 60 分钟 +10,大幅降低金币获取门槛),进度持久化,崩溃不丢。
  */
 export async function tickIdleEarning(idleSeconds: number): Promise<boolean> {
   if (idleSeconds >= 30 * 60) return false;
   const progress = Number((await getSetting('active_minutes')) ?? '0') + 1;
-  if (progress >= 60) {
+  if (progress >= 20) {
     await setSetting('active_minutes', '0');
-    await addCoins(10, 'idle');
+    await addCoins(15, 'idle');
     return true;
   }
   await setSetting('active_minutes', String(progress));

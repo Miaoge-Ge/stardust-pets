@@ -1,344 +1,117 @@
-import { Application, Container, Graphics, Sprite, Texture } from 'pixi.js';
-import { buildFrameSets, TEX_SIZE } from './frames';
-import type { Look } from './petArt';
+/**
+ * 宠物视图:挂载物种 SVG rig + 粒子层 + 光效层,替代旧的 PixiJS/像素渲染。
+ * 对外接口(setAnim/setFlip/setLook/tick/coinBurst/setShadowVisible)保持不变,
+ * 上层 main.ts / FSM 不需要感知底层从 Pixi 换成了 SVG。
+ */
+import type { Look } from './look';
+import { LightEffectField } from './lightEffects';
+import { ParticleField } from './particles';
+import { RigPlayer } from './rig';
+import { getAnim, getSpeciesRig } from './species';
 
 export const VIEW_W = 260;
 export const VIEW_H = 300;
-/** 宠物在窗口内的固定位置(逻辑像素):底部居中 */
 export const PET_X = 130;
-export const PET_FOOT_Y = 282;
-/** 展示尺寸:88px(原 144px 的 ~60%);贴图 192px 线性缩小,精细无马赛克 */
-export const PET_SIZE = 88;
-const K = PET_SIZE / TEX_SIZE;
+/** 宠物底部锚点(逻辑像素,相对窗口) */
+export const PET_FOOT_Y = 278;
+/** 展示框尺寸(SVG 矢量图,清晰缩放不糊) */
+export const PET_SIZE = 130;
 
-interface Particle {
-  g: Graphics;
-  vx: number;
-  vy: number;
-  life: number;
-  maxLife: number;
-}
-
-/** SR/SSR/UR 渲染层特效 + 货币星星爆发 */
-class EffectLayer {
-  back = new Container();
-  front = new Container();
-  private orbitStars: Graphics[] = [];
-  private breathHalo: Graphics | null = null;
-  private rainbowHalo: Graphics | null = null;
-  private cloud: Graphics | null = null;
-  private particles: Particle[] = [];
-  private orbitAngle = 0;
-  private breathT = 0;
-  private hueT = 0;
-  private trailAcc = 0;
-  private sparkleAcc = 0;
-  private trailOn = false;
-  private sparkleOn = false;
-  moving = false;
-
-  configure(effects: string[], accent: number): void {
-    this.back.removeChildren();
-    this.front.removeChildren();
-    this.orbitStars = [];
-    this.breathHalo = null;
-    this.rainbowHalo = null;
-    this.cloud = null;
-    this.trailOn = effects.includes('fx_trail');
-    this.sparkleOn = effects.includes('fx_sparkle');
-
-    if (effects.includes('fx_breath')) {
-      const g = new Graphics();
-      g.circle(0, 0, 42).fill({ color: accent, alpha: 0.16 });
-      g.position.set(PET_X, PET_FOOT_Y - 42);
-      this.breathHalo = g;
-      this.back.addChild(g);
-    }
-    if (effects.includes('fx_rainbow')) {
-      const g = new Graphics();
-      g.circle(0, 0, 46).fill({ color: 0xffffff, alpha: 0.14 });
-      g.position.set(PET_X, PET_FOOT_Y - 44);
-      this.rainbowHalo = g;
-      this.back.addChild(g);
-    }
-    if (effects.includes('fx_cloud')) {
-      const g = new Graphics();
-      g.ellipse(0, 0, 24, 7).fill({ color: 0xffffff, alpha: 0.85 });
-      g.ellipse(-13, 2, 10, 5).fill({ color: 0xffffff, alpha: 0.8 });
-      g.ellipse(13, 2, 10, 5).fill({ color: 0xffffff, alpha: 0.8 });
-      g.position.set(PET_X, PET_FOOT_Y + 4);
-      this.cloud = g;
-      this.back.addChild(g);
-    }
-    if (effects.includes('fx_orbit')) {
-      for (let i = 0; i < 3; i++) {
-        const s = new Graphics();
-        s.star(0, 0, 4, 4.5, 2.2).fill({ color: 0xffd66b });
-        this.front.addChild(s);
-        this.orbitStars.push(s);
-      }
-    }
-  }
-
-  burst(count: number): void {
-    for (let i = 0; i < count; i++) {
-      const g = new Graphics();
-      g.star(0, 0, 5, 4.5, 2.2).fill({ color: 0xffd66b });
-      g.position.set(PET_X + (Math.random() - 0.5) * 30, PET_FOOT_Y - 85);
-      const p: Particle = {
-        g,
-        vx: (Math.random() - 0.5) * 55,
-        vy: -55 - Math.random() * 45,
-        life: 0,
-        maxLife: 900 + Math.random() * 400,
-      };
-      this.front.addChild(g);
-      this.particles.push(p);
-    }
-  }
-
-  private spawnMote(color: number, x: number, y: number, vy: number, life: number): void {
-    const g = new Graphics();
-    g.star(0, 0, 4, 3, 1.4).fill({ color });
-    g.position.set(x, y);
-    this.particles.push({ g, vx: (Math.random() - 0.5) * 18, vy, life: 0, maxLife: life });
-    this.front.addChild(g);
-  }
-
-  tick(ms: number): void {
-    this.orbitAngle += ms * 0.0016;
-    for (let i = 0; i < this.orbitStars.length; i++) {
-      const a = this.orbitAngle + (i * Math.PI * 2) / 3;
-      const s = this.orbitStars[i];
-      s.position.set(PET_X + Math.cos(a) * 40, PET_FOOT_Y - 46 + Math.sin(a) * 18);
-      s.alpha = 0.65 + 0.35 * Math.sin(a * 2);
-    }
-    if (this.breathHalo) {
-      this.breathT += ms * 0.0012;
-      this.breathHalo.alpha = 0.55 + 0.45 * Math.sin(this.breathT);
-      const sc = 1 + 0.06 * Math.sin(this.breathT);
-      this.breathHalo.scale.set(sc);
-    }
-    if (this.rainbowHalo) {
-      // 虹光流转:HSL 色环循环
-      this.hueT += ms * 0.00025;
-      const h = (this.hueT % 1) * 360;
-      this.rainbowHalo.tint = hueToRgb(h);
-      this.rainbowHalo.alpha = 0.75 + 0.25 * Math.sin(this.hueT * 8);
-    }
-    if (this.cloud) {
-      this.cloud.position.y = PET_FOOT_Y + 4 + Math.sin(this.orbitAngle * 1.4) * 2;
-    }
-    if (this.trailOn && this.moving) {
-      this.trailAcc += ms;
-      if (this.trailAcc > 130) {
-        this.trailAcc = 0;
-        this.spawnMote(
-          0xbfe3ff,
-          PET_X + (Math.random() - 0.5) * 34,
-          PET_FOOT_Y - 6 - Math.random() * 28,
-          -14,
-          700
-        );
-      }
-    }
-    if (this.sparkleOn) {
-      this.sparkleAcc += ms;
-      if (this.sparkleAcc > 550) {
-        this.sparkleAcc = 0;
-        this.spawnMote(
-          Math.random() < 0.5 ? 0xffe9a8 : 0xd9c8ff,
-          PET_X + (Math.random() - 0.5) * 70,
-          PET_FOOT_Y - 10 - Math.random() * 70,
-          -8,
-          1400
-        );
-      }
-    }
-    for (let i = this.particles.length - 1; i >= 0; i--) {
-      const p = this.particles[i];
-      p.life += ms;
-      p.g.position.x += (p.vx * ms) / 1000;
-      p.g.position.y += (p.vy * ms) / 1000;
-      p.vy += (60 * ms) / 1000;
-      p.g.alpha = Math.max(0, 1 - p.life / p.maxLife);
-      if (p.life >= p.maxLife) {
-        p.g.destroy();
-        this.particles.splice(i, 1);
-      }
-    }
-  }
-}
-
-function hueToRgb(h: number): number {
-  const f = (n: number): number => {
-    const k = (n + h / 30) % 12;
-    return Math.round(255 * (1 - Math.max(-1, Math.min(1, Math.min(k - 3, 9 - k)))) * 0.5 + 127.5);
-  };
-  return (f(0) << 16) | (f(8) << 8) | f(4);
-}
-
-/** 切换这些状态之间时不做挤压过渡(移动的连续性) */
-const LOCO = new Set(['walk', 'run', 'jump']);
-const TRANS_MS = 240;
-const GHOST_MS = 150;
+const CTX_CX = 50;
+const CTX_CY = 55;
+const CTX_RADIUS = 30;
 
 export class PetView {
-  app: Application;
-  sprite!: Sprite;
-  /** 上一动作的残影,交叉淡出让切换不生硬 */
-  ghost!: Sprite;
-  shadow!: Graphics;
-  effects = new EffectLayer();
-  sets: Record<string, Texture[]> = {};
-  key = 'sit';
-  fps = 5;
-  dir: 1 | -1 = 1;
-  private acc = 0;
-  private idx = 0;
-  private transT = TRANS_MS; // 挤压过渡计时(≥TRANS_MS 表示结束)
-  private ghostT = GHOST_MS;
-  private breathT = 0;
+  private wrap: HTMLDivElement;
+  private shadowEl: HTMLDivElement;
+  private player!: RigPlayer;
+  private particles!: ParticleField;
+  private lights!: LightEffectField;
+  private speciesId = 'sp_cat';
+  private dir: 1 | -1 = 1;
+  private currentKey = '';
+  private accent = '#5a9fd9';
 
   static async create(container: HTMLElement, look: Look): Promise<PetView> {
-    const app = new Application();
-    await app.init({
-      width: VIEW_W,
-      height: VIEW_H,
-      backgroundAlpha: 0,
-      antialias: false,
-    });
-    // 动作帧率最高 10fps,渲染循环压到 30fps 以控制空闲 CPU 占用
-    app.ticker.maxFPS = 30;
-    container.appendChild(app.canvas);
-    return new PetView(app, look);
+    return new PetView(container, look);
   }
 
-  private constructor(app: Application, look: Look) {
-    this.app = app;
+  private constructor(private container: HTMLElement, look: Look) {
+    this.shadowEl = document.createElement('div');
+    this.shadowEl.style.position = 'absolute';
+    this.shadowEl.style.left = `${PET_X - 32}px`;
+    this.shadowEl.style.top = `${PET_FOOT_Y - 4}px`;
+    this.shadowEl.style.width = '64px';
+    this.shadowEl.style.height = '14px';
+    this.shadowEl.style.borderRadius = '50%';
+    this.shadowEl.style.background = 'rgba(0,0,0,.2)';
+    this.shadowEl.style.filter = 'blur(1px)';
+    container.appendChild(this.shadowEl);
 
-    app.stage.addChild(this.effects.back);
-
-    this.shadow = new Graphics();
-    this.shadow.ellipse(0, 0, 23, 5).fill({ color: 0x000000, alpha: 0.18 });
-    this.shadow.position.set(PET_X, PET_FOOT_Y + 3);
-    app.stage.addChild(this.shadow);
-
-    this.ghost = new Sprite();
-    this.ghost.anchor.set(0.5, 1);
-    this.ghost.position.set(PET_X, PET_FOOT_Y);
-    this.ghost.scale.set(K);
-    this.ghost.alpha = 0;
-    app.stage.addChild(this.ghost);
-
-    this.sprite = new Sprite();
-    this.sprite.anchor.set(0.5, 1);
-    this.sprite.position.set(PET_X, PET_FOOT_Y);
-    this.sprite.scale.set(K);
-    app.stage.addChild(this.sprite);
-
-    app.stage.addChild(this.effects.front);
+    this.wrap = document.createElement('div');
+    this.wrap.style.position = 'absolute';
+    this.wrap.style.left = `${PET_X - PET_SIZE / 2}px`;
+    this.wrap.style.top = `${PET_FOOT_Y - PET_SIZE}px`;
+    this.wrap.style.width = `${PET_SIZE}px`;
+    this.wrap.style.height = `${PET_SIZE}px`;
+    container.appendChild(this.wrap);
 
     this.setLook(look);
   }
 
-  /** 切换出场宠物:重建全套贴图 + 特效 */
+  /** 切换出场宠物:重建 rig + 配色 + 光效 */
   setLook(look: Look): void {
-    const old = this.sets;
-    const canvases = buildFrameSets(look);
-    const sets: Record<string, Texture[]> = {};
-    for (const [k, arr] of Object.entries(canvases)) {
-      sets[k] = arr.map((cv) => {
-        const t = Texture.from(cv);
-        // 贴图为 4× 平滑放大,线性采样缩小 → 精细边缘
-        t.source.scaleMode = 'linear';
-        return t;
-      });
-    }
-    this.sets = sets;
-    this.idx = 0;
-    this.acc = 0;
-    this.sprite.texture = this.sets[this.key]?.[0] ?? this.sets.sit[0];
-    const accent = parseInt(look.colors.accent.slice(1), 16);
-    this.effects.configure(look.effects, Number.isFinite(accent) ? accent : 0xffd66b);
-    for (const arr of Object.values(old)) for (const t of arr) t.destroy(true);
+    this.speciesId = look.species;
+    this.player = new RigPlayer(this.wrap, getSpeciesRig(look.species));
+    const svg = this.wrap.querySelector('svg') as SVGSVGElement;
+
+    const c = look.colors;
+    this.accent = c.animated && c.gradientStops ? c.gradientStops[0] : c.accent;
+    this.player.setColors({
+      'c-body': c.body,
+      'c-shade': c.shade,
+      'c-light': c.light,
+      'c-belly': c.belly,
+      'c-outline': c.outline,
+      'c-pattern': c.pattern,
+      'c-accent': this.accent,
+    });
+    this.player.setFlip(this.dir);
+
+    this.particles = new ParticleField(svg);
+    this.lights = new LightEffectField(svg, svg.querySelector('[data-flip-root]'));
+    this.lights.configure(look.effects, { cx: CTX_CX, cy: CTX_CY, radius: CTX_RADIUS, accent: this.accent });
+
+    const key = this.currentKey || 'sit';
+    this.currentKey = '';
+    this.setAnim(key, 0);
   }
 
-  setAnim(key: string, fps: number): void {
-    if (!this.sets[key]) key = 'sit';
-    if (this.key === key) {
-      this.fps = fps;
-      return;
-    }
-    const smooth = !(LOCO.has(this.key) && LOCO.has(key));
-    // 残影交叉淡出
-    this.ghost.texture = this.sprite.texture;
-    this.ghost.scale.x = K * this.dir;
-    this.ghost.scale.y = K;
-    this.ghost.alpha = 0.7;
-    this.ghostT = 0;
-    // 挤压-拉伸缓冲(移动状态之间跳过,保持步态连续)
-    if (smooth) this.transT = 0;
-
-    this.key = key;
-    this.fps = fps;
-    this.idx = 0;
-    this.acc = 0;
-    this.sprite.texture = this.sets[key][0];
-    this.effects.moving = LOCO.has(key);
+  setAnim(key: string, _fps: number): void {
+    if (this.currentKey === key) return;
+    this.currentKey = key;
+    const anim = getAnim(this.speciesId, key);
+    if (anim) this.player.play(anim);
   }
 
   setFlip(dir: 1 | -1): void {
     this.dir = dir;
+    this.player?.setFlip(dir);
   }
 
   setShadowVisible(v: boolean): void {
-    this.shadow.visible = v;
+    this.shadowEl.style.display = v ? '' : 'none';
   }
 
   /** 获得星星币时的爆发动画 */
   coinBurst(): void {
-    this.effects.burst(8);
+    this.particles.burst('coin', CTX_CX, CTX_CY - 25, 5);
+    this.particles.burst('star5', CTX_CX, CTX_CY - 25, 4);
   }
 
   tick(ms: number): void {
-    const frames = this.sets[this.key];
-    if (frames && frames.length > 0) {
-      this.acc += ms;
-      const frameMs = 1000 / this.fps;
-      while (this.acc >= frameMs) {
-        this.acc -= frameMs;
-        this.idx = (this.idx + 1) % frames.length;
-      }
-      this.sprite.texture = frames[this.idx];
-    }
-
-    // 残影淡出
-    if (this.ghostT < GHOST_MS) {
-      this.ghostT += ms;
-      this.ghost.alpha = Math.max(0, 0.7 * (1 - this.ghostT / GHOST_MS));
-    } else if (this.ghost.alpha > 0) {
-      this.ghost.alpha = 0;
-    }
-
-    // 挤压-拉伸过渡包络:轻压 → 回弹 → 归位
-    let sx = 1;
-    let sy = 1;
-    if (this.transT < TRANS_MS) {
-      this.transT += ms;
-      const t = Math.min(1, this.transT / TRANS_MS);
-      const wobble = Math.sin(t * Math.PI * 2) * (1 - t);
-      sy = 1 - 0.09 * wobble;
-      sx = 1 + 0.07 * wobble;
-    }
-
-    // 持续呼吸(所有状态之上叠加的微幅起伏,让宠物始终是"活"的)
-    this.breathT += ms;
-    const breath = 1 + 0.012 * Math.sin(this.breathT / 420);
-
-    this.sprite.scale.x = K * this.dir * sx;
-    this.sprite.scale.y = K * sy * breath;
-
-    this.effects.tick(ms);
+    this.player?.tick(ms);
+    this.particles?.tick(ms);
+    this.lights?.tick(performance.now(), { cx: CTX_CX, cy: CTX_CY, radius: CTX_RADIUS, accent: this.accent });
   }
 }

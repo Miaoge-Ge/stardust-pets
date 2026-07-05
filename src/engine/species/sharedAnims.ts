@@ -112,7 +112,7 @@ export const SHARED_ANIMS: Record<string, RigAnim> = {
       { t: 1, parts: { body: { rotate: -6 }, legs: { rotate: 4 } } },
     ],
   },
-  click_happy: {
+  happy: {
     loop: false,
     durationMs: 700,
     keyframes: [
@@ -130,7 +130,7 @@ export const SHARED_ANIMS: Record<string, RigAnim> = {
       { t: 1, parts: { head: { rotate: 0, ty: 0 } } },
     ],
   },
-  hold_sign: {
+  sign: {
     loop: true,
     durationMs: 1600,
     keyframes: [
@@ -157,7 +157,7 @@ export const SHARED_ANIMS: Record<string, RigAnim> = {
       { t: 1, parts: { head: { ty: 0 } } },
     ],
   },
-  play_yarn: {
+  yarn: {
     loop: true,
     durationMs: 600,
     keyframes: [
@@ -166,7 +166,7 @@ export const SHARED_ANIMS: Record<string, RigAnim> = {
       { t: 1, parts: { legs: { rotate: 0 } } },
     ],
   },
-  curious_look: {
+  curious: {
     loop: false,
     durationMs: 800,
     keyframes: [
@@ -174,7 +174,7 @@ export const SHARED_ANIMS: Record<string, RigAnim> = {
       { t: 1, parts: { head: { rotate: 12, tx: 2 } } },
     ],
   },
-  wake_startled: {
+  wake: {
     loop: false,
     durationMs: 700,
     keyframes: [
