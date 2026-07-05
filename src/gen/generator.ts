@@ -5,7 +5,7 @@
  * 全程由带种子的 PRNG 驱动,同一 seed 完整复现。
  */
 import partsCfg from '../config/parts.json';
-import { hslToHex, shade } from './colors';
+import { randomCreatureColors } from './colors';
 import { mulberry32, pickRng, type Rng } from './prng';
 
 export type Rarity = 'N' | 'R' | 'SR' | 'SSR' | 'UR';
@@ -41,6 +41,7 @@ export interface Colors {
   pattern: string;
   accent: string;
   animated: boolean;
+  gradientStops?: string[];
 }
 
 export interface GeneratedPet {
@@ -183,39 +184,15 @@ interface PaletteStops {
 
 const PALETTES = partsCfg.palettes as unknown as Record<string, PaletteHue | PaletteStops>;
 
-function lerp(rng: Rng, [a, b]: [number, number]): number {
-  return a + rng() * (b - a);
-}
-
+/**
+ * 配色:色相/明度/饱和度完全随机(不再受限于该 palette id 预设的固定色相区间),
+ * palette 维度仍作为图鉴收集标签保留;仅当该 palette 被标记 animated(极光/暮光/星云/
+ * 鎏金/棱镜/炎阳等高稀有度专属)时才叠加流光渐变加成。
+ */
 export function resolveColors(paletteId: string, rng: Rng): Colors {
   const def = PALETTES[paletteId];
-  if (def && 'stops' in def) {
-    const body = def.stops[0];
-    return {
-      body,
-      shade: shade(body, -0.22),
-      light: def.stops[1],
-      belly: shade(body, 0.45),
-      outline: shade(body, -0.62),
-      pattern: def.stops[2],
-      accent: def.stops[2],
-      animated: !!def.animated,
-    };
-  }
-  const h = def ? lerp(rng, (def as PaletteHue).hue) : lerp(rng, [18, 42]);
-  const s = def ? lerp(rng, (def as PaletteHue).sat) : 70;
-  const l = def ? lerp(rng, (def as PaletteHue).lit) : 62;
-  const body = hslToHex(h, s, l);
-  return {
-    body,
-    shade: shade(body, -0.2),
-    light: shade(body, 0.22),
-    belly: hslToHex(h + 8, Math.max(20, s - 15), Math.min(92, l + 24)),
-    outline: hslToHex(h, Math.min(60, s + 5), Math.max(12, l - 45)),
-    pattern: hslToHex(h + 25, s, Math.max(25, l - 22)),
-    accent: hslToHex(h + 180, Math.min(85, s + 10), 62),
-    animated: false,
-  };
+  const animatedBonus = !!(def && 'stops' in def && def.animated);
+  return randomCreatureColors(rng, animatedBonus);
 }
 
 // ---------------------------------------------------------------- 整只生成

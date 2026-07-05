@@ -44,3 +44,44 @@ export function mix(a: string, b: string, t: number): string {
   const [r2, g2, b2] = hexToRgb(b);
   return rgbToHex(r1 + (r2 - r1) * t, g1 + (g2 - g1) * t, b1 + (b2 - b1) * t);
 }
+
+export interface CreatureColors {
+  body: string;
+  shade: string;
+  light: string;
+  belly: string;
+  outline: string;
+  pattern: string;
+  accent: string;
+  animated: boolean;
+  gradientStops?: string[];
+}
+
+/**
+ * 全随机配色:色相 0~360 完全随机(不再局限于预设色板的固定色相区间)。
+ * animatedBonus = true 时额外生成三段流光渐变色(高稀有度专属观感)。
+ */
+export function randomCreatureColors(rng: () => number, animatedBonus: boolean): CreatureColors {
+  const hue = rng() * 360;
+  const sat = 40 + rng() * 50; // 40~90
+  const lit = 42 + rng() * 32; // 42~74
+  const body = hslToHex(hue, sat, lit);
+  const patternShift = (25 + rng() * 60) * (rng() < 0.5 ? 1 : -1);
+  const pattern = hslToHex(hue + patternShift, Math.min(92, sat + 5), Math.max(18, lit - 22));
+  const accent = hslToHex(hue + 165 + (rng() - 0.5) * 50, Math.min(88, sat + 12), 58 + rng() * 10);
+  const base: CreatureColors = {
+    body,
+    shade: shade(body, -0.22),
+    light: shade(body, 0.22),
+    belly: hslToHex(hue + 8, Math.max(12, sat - 22), Math.min(92, lit + 26)),
+    outline: hslToHex(hue, Math.min(60, sat + 5), Math.max(10, lit - 45)),
+    pattern,
+    accent,
+    animated: false,
+  };
+  if (!animatedBonus) return base;
+  const stops = [hue, hue + 55 + rng() * 70, hue + 150 + rng() * 70].map((h) =>
+    hslToHex(h, 68 + rng() * 22, 58 + rng() * 18)
+  );
+  return { ...base, animated: true, gradientStops: stops };
+}
