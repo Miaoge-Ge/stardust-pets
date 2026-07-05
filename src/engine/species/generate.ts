@@ -3,12 +3,37 @@
  * 颈部融合/扁平宽体等),但输出层是手绘贝塞尔矢量形状而非像素格,用于快速
  * 覆盖猫以外的其余 19 个物种,同时保持每种在轮廓上有真实区别。
  */
+import type { Look } from '../look';
 import type { SpeciesRig } from '../rig';
+import { headwearMarkup, materialMarkup, neckwearMarkup } from './accessories';
 
-type EarStyle = 'round' | 'pointy' | 'floppy' | 'none' | 'horn' | 'antler' | 'small' | 'tuft';
-type TailStyle = 'short' | 'long' | 'fluffy' | 'none' | 'curl' | 'feather';
+type EarStyle = 'round' | 'pointy' | 'floppy' | 'none' | 'horn' | 'antler' | 'small' | 'tuft' | 'rabbit';
+type TailStyle = 'short' | 'long' | 'fluffy' | 'none' | 'curl' | 'feather' | 'twin' | 'star';
 type BeakStyle = 'none' | 'pointed' | 'flat';
 type LegMode = 'stubby' | 'normal' | 'long' | 'none';
+
+/** 收藏部件 id → 渲染样式。少数物种(鹿的鹿角、龙的角耳)的耳朵是其解剖特征本身,
+ * 不随抽到的耳朵部件变化;其余物种的耳朵/尾巴样式都尊重玩家实际抽到的部件 id。 */
+const EAR_ID_TO_STYLE: Record<string, EarStyle> = {
+  ears_up: 'pointy',
+  ears_flop: 'floppy',
+  ears_fold: 'small',
+  ears_rabbit: 'rabbit',
+  ears_round: 'round',
+  ears_sharp: 'pointy',
+  ears_none: 'none',
+  ears_horn: 'horn',
+};
+
+const TAIL_ID_TO_STYLE: Record<string, TailStyle> = {
+  tail_short: 'short',
+  tail_long: 'long',
+  tail_curl: 'curl',
+  tail_fluffy: 'fluffy',
+  tail_none: 'none',
+  tail_twin: 'twin',
+  tail_star: 'star',
+};
 
 export interface ShapeSpec {
   bodyRx: number;
@@ -16,6 +41,8 @@ export interface ShapeSpec {
   headR: number;
   neckFuse?: boolean;
   earStyle: EarStyle;
+  /** false = 耳朵是解剖特征本身(鹿角/龙角),始终用 earStyle,不随收藏部件变化 */
+  earsOverridable?: boolean;
   tailStyle: TailStyle;
   muzzle?: boolean;
   beak?: BeakStyle;
@@ -72,6 +99,11 @@ function earsMarkup(style: EarStyle, headCy: number, headR: number): { left: str
         left: `<path d="M ${HEAD_CX - 4} ${top + 2} L ${HEAD_CX - 5} ${top - 8} L ${HEAD_CX - 1} ${top + 1} Z" fill="var(--c-accent)"/>`,
         right: `<path d="M ${HEAD_CX + 4} ${top + 2} L ${HEAD_CX + 5} ${top - 8} L ${HEAD_CX + 1} ${top + 1} Z" fill="var(--c-accent)"/>`,
       };
+    case 'rabbit':
+      return {
+        left: `<ellipse cx="${HEAD_CX - 5}" cy="${top - 6}" rx="3" ry="11" fill="var(--c-body)" stroke="var(--c-outline)" stroke-width="1.4"/><ellipse cx="${HEAD_CX - 5}" cy="${top - 6}" rx="1.4" ry="8" fill="var(--c-belly)"/>`,
+        right: `<ellipse cx="${HEAD_CX + 5}" cy="${top - 6}" rx="3" ry="11" fill="var(--c-body)" stroke="var(--c-outline)" stroke-width="1.4"/><ellipse cx="${HEAD_CX + 5}" cy="${top - 6}" rx="1.4" ry="8" fill="var(--c-belly)"/>`,
+      };
     case 'pointy':
     default:
       return {
@@ -102,6 +134,21 @@ function tailMarkup(style: TailStyle, bodyRx: number, bodyRy: number): string {
       return `<path d="M ${baseX} ${baseY} C ${baseX + 16} ${baseY + 2} ${baseX + 22} ${baseY - 14} ${baseX + 14} ${baseY - 20}
               C ${baseX + 12} ${baseY - 14} ${baseX + 15} ${baseY - 6} ${baseX + 4} ${baseY - 4} Z"
               fill="var(--c-body)" stroke="var(--c-outline)" stroke-width="1.5" stroke-linejoin="round"/>`;
+    case 'twin':
+      return `<path d="M ${baseX} ${baseY} C ${baseX + 12} ${baseY - 4} ${baseX + 14} ${baseY - 14} ${baseX + 8} ${baseY - 18}
+              C ${baseX + 10} ${baseY - 12} ${baseX + 8} ${baseY - 4} ${baseX} ${baseY} Z" fill="var(--c-body)" stroke="var(--c-outline)" stroke-width="1.4" stroke-linejoin="round"/>
+              <path d="M ${baseX - 2} ${baseY + 3} C ${baseX + 8} ${baseY + 2} ${baseX + 12} ${baseY - 6} ${baseX + 8} ${baseY - 12}
+              C ${baseX + 8} ${baseY - 6} ${baseX + 6} ${baseY + 1} ${baseX - 2} ${baseY + 3} Z" fill="var(--c-shade)" stroke="var(--c-outline)" stroke-width="1.2" stroke-linejoin="round"/>`;
+    case 'star': {
+      const tipX = baseX + 15;
+      const tipY = baseY - 20;
+      return `<path d="M ${baseX} ${baseY} C ${baseX + 12} ${baseY - 2} ${baseX + 18} ${baseY - 12} ${tipX} ${tipY}
+              C ${baseX + 15} ${baseY - 24} ${baseX + 9} ${baseY - 23} ${baseX + 9} ${baseY - 18}
+              C ${baseX + 9} ${baseY - 12} ${baseX + 4} ${baseY - 7} ${baseX - 3} ${baseY - 6} Z"
+              fill="var(--c-body)" stroke="var(--c-outline)" stroke-width="1.5" stroke-linejoin="round"/>
+              <path d="M ${tipX} ${tipY - 4} L ${tipX + 1.2} ${tipY - 1.2} L ${tipX + 4} ${tipY} L ${tipX + 1.2} ${tipY + 1.2}
+              L ${tipX} ${tipY + 4} L ${tipX - 1.2} ${tipY + 1.2} L ${tipX - 4} ${tipY} L ${tipX - 1.2} ${tipY - 1.2} Z" fill="#f2c14e"/>`;
+    }
     case 'curl':
     default:
       return `<path d="M ${baseX} ${baseY} C ${baseX + 12} ${baseY - 2} ${baseX + 20} ${baseY - 12} ${baseX + 17} ${baseY - 22}
@@ -209,21 +256,26 @@ function featuresMarkup(spec: ShapeSpec, bodyRx: number, bodyRy: number): string
   return parts.join('\n');
 }
 
-export function buildSpeciesRig(spec: ShapeSpec): SpeciesRig {
+export function buildSpeciesRig(spec: ShapeSpec, look: Look): SpeciesRig {
   const headCy = spec.neckFuse ? BODY_CY - spec.bodyRy - spec.headR * 0.55 : BODY_CY - spec.bodyRy - spec.headR * 0.75;
   const bodyBottomWave = spec.floaty
     ? `<path d="M ${BODY_CX - spec.bodyRx} ${BODY_CY + 4} Q ${BODY_CX - spec.bodyRx * 0.5} ${BODY_CY + spec.bodyRy + 10} ${BODY_CX} ${BODY_CY + 4}
        Q ${BODY_CX + spec.bodyRx * 0.5} ${BODY_CY + spec.bodyRy + 10} ${BODY_CX + spec.bodyRx} ${BODY_CY + 4} Z" fill="var(--c-body)" stroke="var(--c-outline)" stroke-width="1.6"/>`
     : '';
-  const ears = earsMarkup(spec.earStyle, headCy, spec.headR);
+  const earStyle: EarStyle = spec.earsOverridable === false ? spec.earStyle : (EAR_ID_TO_STYLE[look.ears] ?? spec.earStyle);
+  const tailStyle: TailStyle = TAIL_ID_TO_STYLE[look.tail] ?? spec.tailStyle;
+  const ears = earsMarkup(earStyle, headCy, spec.headR);
+  const neckY = BODY_CY - spec.bodyRy * 0.55;
 
   const svg = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-    <g data-part="tailBase">${tailMarkup(spec.tailStyle, spec.bodyRx, spec.bodyRy)}</g>
+    <g data-part="tailBase">${tailMarkup(tailStyle, spec.bodyRx, spec.bodyRy)}</g>
     <g data-part="legs">${legsMarkup(spec.legMode, spec.bodyRx, spec.bodyRy)}</g>
     <g data-part="body">
       <ellipse cx="${BODY_CX}" cy="${BODY_CY}" rx="${spec.bodyRx}" ry="${spec.bodyRy}" fill="var(--c-body)" stroke="var(--c-outline)" stroke-width="1.8"/>
       ${bodyBottomWave}
       ${featuresMarkup(spec, spec.bodyRx, spec.bodyRy)}
+      ${materialMarkup(look.material, BODY_CX, BODY_CY, spec.bodyRx, spec.bodyRy)}
+      ${neckwearMarkup(look.neckwear, BODY_CX, neckY)}
     </g>
     <g data-part="earR">${ears.right}</g>
     <g data-part="earL">${ears.left}</g>
@@ -231,6 +283,7 @@ export function buildSpeciesRig(spec: ShapeSpec): SpeciesRig {
       <circle cx="${HEAD_CX}" cy="${headCy}" r="${spec.headR}" fill="var(--c-body)" stroke="var(--c-outline)" stroke-width="1.8"/>
       ${spec.muzzle ? `<ellipse cx="${HEAD_CX}" cy="${headCy + spec.headR * 0.35}" rx="${spec.headR * 0.55}" ry="${spec.headR * 0.4}" fill="var(--c-belly)"/>` : ''}
       ${faceMarkup(spec, headCy, spec.headR)}
+      ${headwearMarkup(look.headwear, HEAD_CX, headCy, spec.headR)}
     </g>
   </svg>`;
 
@@ -262,9 +315,9 @@ export const SPECIES_SHAPES: Record<string, ShapeSpec> = {
   sp_penguin:  { bodyRx: 18, bodyRy: 23, headR: 13, earStyle: 'none', tailStyle: 'short', beak: 'pointed', bigBelly: true, legMode: 'stubby' },
   sp_turtle:   { bodyRx: 25, bodyRy: 16, headR: 12, earStyle: 'none', tailStyle: 'short', shell: true, legMode: 'stubby' },
   sp_owl:      { bodyRx: 20, bodyRy: 21, headR: 17, neckFuse: true, earStyle: 'tuft', tailStyle: 'short', beak: 'pointed', eyeRings: true, legMode: 'stubby' },
-  sp_deer:     { bodyRx: 18, bodyRy: 19, headR: 14, earStyle: 'antler', tailStyle: 'short', muzzle: true, legMode: 'long' },
+  sp_deer:     { bodyRx: 18, bodyRy: 19, headR: 14, earStyle: 'antler', earsOverridable: false, tailStyle: 'short', muzzle: true, legMode: 'long' },
   sp_bat:      { bodyRx: 16, bodyRy: 17, headR: 15, earStyle: 'pointy', tailStyle: 'none', wingBig: true, legMode: 'stubby' },
-  sp_dragon:   { bodyRx: 20, bodyRy: 18, headR: 15, earStyle: 'horn', tailStyle: 'long', spikes: true, legMode: 'normal' },
+  sp_dragon:   { bodyRx: 20, bodyRy: 18, headR: 15, earStyle: 'horn', earsOverridable: false, tailStyle: 'long', spikes: true, legMode: 'normal' },
   sp_unicorn:  { bodyRx: 19, bodyRy: 20, headR: 15, earStyle: 'round', tailStyle: 'long', horn: true, muzzle: true, legMode: 'long' },
   sp_phoenix:  { bodyRx: 16, bodyRy: 18, headR: 13, earStyle: 'none', tailStyle: 'feather', beak: 'pointed', crest: true, legMode: 'stubby' },
   sp_slime:    { bodyRx: 22, bodyRy: 20, headR: 10, neckFuse: true, earStyle: 'none', tailStyle: 'none', legMode: 'none' },

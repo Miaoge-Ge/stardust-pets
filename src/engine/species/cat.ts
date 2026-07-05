@@ -2,12 +2,20 @@
  * 猫:第一个完整矢量模型(验证 rig 管线用)。
  * 用分层椭圆/贝塞尔路径构建(专业扁平插画常用技法),而非像素格拼接,
  * 边缘天然平滑抗锯齿,配色全部走 CSS 变量,换色零成本。
+ * 耳朵/尾巴是猫的招牌造型,保持手绘固定;头饰/颈饰仍按玩家实际抽到的部件叠加。
  */
+import type { Look } from '../look';
 import type { SpeciesRig } from '../rig';
+import { headwearMarkup, materialMarkup, neckwearMarkup } from './accessories';
 import { SHARED_ANIMS } from './sharedAnims';
 
-export const CAT_RIG: SpeciesRig = {
-  svg: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+const HEAD_CX = 50;
+const HEAD_CY = 38;
+const HEAD_R = 19;
+const NECK_Y = 56;
+
+export function buildCatRig(look: Look): SpeciesRig {
+  const svg = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
     <g data-part="tailBase">
       <path d="M 68 78 C 80 76 88 66 85 56 C 83 50 78 51 78 57 C 78 64 73 70 65 71 Z"
         fill="var(--c-body)" stroke="var(--c-outline)" stroke-width="1.6" stroke-linejoin="round"/>
@@ -20,6 +28,8 @@ export const CAT_RIG: SpeciesRig = {
       <ellipse cx="50" cy="64" rx="24" ry="20" fill="var(--c-body)" stroke="var(--c-outline)" stroke-width="1.8"/>
       <ellipse cx="50" cy="72" rx="13" ry="11" fill="var(--c-belly)"/>
       <path data-pattern="1" d="M 31 52 Q 50 46 69 52 L 69 56 Q 50 50 31 56 Z" fill="var(--c-pattern)" opacity="0.5"/>
+      ${materialMarkup(look.material, 50, 64, 24, 20)}
+      ${neckwearMarkup(look.neckwear, HEAD_CX, NECK_Y)}
     </g>
     <g data-part="earR">
       <path d="M 62 28 L 74 8 L 68 32 Z" fill="var(--c-body)" stroke="var(--c-outline)" stroke-width="1.6" stroke-linejoin="round"/>
@@ -48,18 +58,23 @@ export const CAT_RIG: SpeciesRig = {
         <line x1="70" y1="40" x2="80" y2="38"/>
         <line x1="70" y1="43" x2="80" y2="44"/>
       </g>
+      ${headwearMarkup(look.headwear, HEAD_CX, HEAD_CY, HEAD_R)}
     </g>
-  </svg>`,
-  origins: {
-    body: [50, 74],
-    head: [50, 57],
-    earL: [38, 30],
-    earR: [62, 30],
-    tailBase: [68, 74],
-    eyeL: [43, 37],
-    eyeR: [57, 37],
-  },
-  animations: {},
-};
+  </svg>`;
+
+  return {
+    svg,
+    origins: {
+      body: [50, 74],
+      head: [50, 57],
+      earL: [38, 30],
+      earR: [62, 30],
+      tailBase: [68, 74],
+      eyeL: [43, 37],
+      eyeR: [57, 37],
+    },
+    animations: {},
+  };
+}
 
 export { SHARED_ANIMS };

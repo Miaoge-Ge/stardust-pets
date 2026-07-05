@@ -105,6 +105,15 @@ export class RigPlayer {
       svgEl.appendChild(flip);
     }
     this.flipG = flip;
+    // 关键:不设置 transform-origin 时 scaleX(-1) 会绕 viewBox 左上角(0,0)翻转,
+    // 把整只宠物甩到 x<0 的可视区域外而被裁剪掉(=看起来"消失")。
+    // 显式绕 viewBox 水平中点 + 脚底线翻转/缩放,翻转后仍落在原可视范围内,
+    // 体型缩放(见 setBodyScale)也绕脚底线进行,缩放时脚不会离地悬空。
+    const vb = svgEl.viewBox.baseVal;
+    const midX = vb && vb.width > 0 ? vb.x + vb.width / 2 : 50;
+    const groundY = vb && vb.height > 0 ? vb.y + vb.height * 0.94 : 90;
+    flip.style.transformBox = 'view-box';
+    flip.style.transformOrigin = `${midX}px ${groundY}px`;
     for (const [id, origin] of Object.entries(rig.origins)) {
       const g = svgEl.querySelector(`[data-part="${id}"]`) as SVGGElement | null;
       if (!g) continue;
@@ -114,8 +123,23 @@ export class RigPlayer {
     }
   }
 
+  private dir: 1 | -1 = 1;
+  private bodyScale = 1;
+
   setFlip(dir: 1 | -1): void {
-    this.flipG.style.transform = dir === -1 ? 'scaleX(-1)' : 'none';
+    this.dir = dir;
+    this.applyTransform();
+  }
+
+  /** 体型收藏维度(迷你/矮胖等):整体缩放,绕脚底线进行,缩放后仍站在原地面上 */
+  setBodyScale(scale: number): void {
+    this.bodyScale = scale;
+    this.applyTransform();
+  }
+
+  private applyTransform(): void {
+    const sx = this.dir === -1 ? -this.bodyScale : this.bodyScale;
+    this.flipG.style.transform = `scale(${sx}, ${this.bodyScale})`;
   }
 
   setColors(vars: Record<string, string>): void {

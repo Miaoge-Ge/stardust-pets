@@ -153,9 +153,9 @@
     "pal_solar":    { "stops": ["#ff8c42", "#ffd166", "#ff5d73"], "animated": true }
   },
   "series": {
-    "series_bakery": { "name": "烘焙屋系列", "parts": ["pat_pudding", "head_beret", "pal_cream"], "reward": 200 },
-    "series_night":  { "name": "星夜系列",   "parts": ["pat_nebula", "pal_nebula", "tail_star"],  "reward": 500 },
-    "series_winter": { "name": "冬日系列",   "parts": ["neck_scarf", "pal_mint", "ears_fold"],    "reward": 200 },
-    "series_noble":  { "name": "贵族系列",   "parts": ["head_crown", "head_monocle", "neck_necklace", "pal_gold"], "reward": 300 }
+    "series_bakery": { "name": "烘焙屋系列", "parts": ["head_beret", "neck_bowtie", "tail_fluffy"], "reward": 200 },
+    "series_night":  { "name": "星夜系列",   "parts": ["tail_star", "head_halo", "neck_cape"],      "reward": 500 },
+    "series_winter": { "name": "冬日系列",   "parts": ["neck_scarf", "ears_fold", "head_cap"],      "reward": 200 },
+    "series_noble":  { "name": "贵族系列",   "parts": ["head_crown", "head_monocle", "neck_necklace"], "reward": 300 }
   }
 }

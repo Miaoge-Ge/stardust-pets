@@ -1,21 +1,41 @@
 /**
- * 新矢量渲染系统的宠物外观描述:物种 + 配色 + 特效。
- * 收藏部件(耳/尾/花纹/头饰/颈饰/材质)的具体 id 仍保存在存档里供图鉴/成就使用,
- * 但视觉呈现由物种 rig 决定;把它们接回矢量渲染是后续一轮的工作。
+ * 矢量渲染系统的宠物外观描述:物种 + 体型 + 耳/尾/头饰/颈饰 + 配色 + 特效。
+ * 耳/尾/头饰/颈饰/体型这几个收藏维度已重新接回渲染(见 engine/species/generate.ts),
+ * 图鉴里点亮的部件会在宠物身上真正体现出来,而不再是纯数据标签。
+ * 材质/花纹/眼睛/嘴型暂未接入矢量渲染,留待后续一轮。
  */
 import type { Colors } from '../gen/generator';
 import { LightEffectField } from './lightEffects';
-import { getSpeciesRig } from './species';
+import { buildLookRig } from './species';
 
 export interface Look {
   species: string;
+  body: string;
+  material: string;
+  ears: string;
+  tail: string;
+  headwear: string;
+  neckwear: string;
   colors: Colors;
   effects: string[];
 }
 
+export const BODY_SCALE: Record<string, number> = {
+  body_round: 1.06,
+  body_slim: 0.94,
+  body_chub: 1.18,
+  body_mini: 0.78,
+};
+
 export function lookFromParts(ids: Record<string, string>, effects: string[], colors: Colors): Look {
   return {
     species: ids.species ?? 'sp_cat',
+    body: ids.body ?? 'body_round',
+    material: ids.material ?? 'mat_fur',
+    ears: ids.ears ?? 'ears_up',
+    tail: ids.tail ?? 'tail_long',
+    headwear: ids.headwear ?? 'head_none',
+    neckwear: ids.neckwear ?? 'neck_none',
     colors,
     effects,
   };
@@ -26,10 +46,15 @@ export function renderPortrait(look: Look): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'pet-portrait';
   wrap.style.display = 'block';
-  wrap.innerHTML = getSpeciesRig(look.species).svg;
+  wrap.innerHTML = buildLookRig(look).svg;
   const svg = wrap.querySelector('svg') as SVGSVGElement;
   svg.style.width = '100%';
   svg.style.height = '100%';
+  const scale = BODY_SCALE[look.body] ?? 1;
+  if (scale !== 1) {
+    svg.style.transform = `scale(${scale})`;
+    svg.style.transformOrigin = '50% 90%';
+  }
 
   const c = look.colors;
   const accent = c.animated && c.gradientStops ? c.gradientStops[0] : c.accent;

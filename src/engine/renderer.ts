@@ -3,11 +3,11 @@
  * 对外接口(setAnim/setFlip/setLook/tick/coinBurst/setShadowVisible)保持不变,
  * 上层 main.ts / FSM 不需要感知底层从 Pixi 换成了 SVG。
  */
-import type { Look } from './look';
+import { BODY_SCALE, type Look } from './look';
 import { LightEffectField } from './lightEffects';
 import { ParticleField } from './particles';
 import { RigPlayer } from './rig';
-import { getAnim, getSpeciesRig } from './species';
+import { buildLookRig, getAnim } from './species';
 
 export const VIEW_W = 260;
 export const VIEW_H = 300;
@@ -62,7 +62,7 @@ export class PetView {
   /** 切换出场宠物:重建 rig + 配色 + 光效 */
   setLook(look: Look): void {
     this.speciesId = look.species;
-    this.player = new RigPlayer(this.wrap, getSpeciesRig(look.species));
+    this.player = new RigPlayer(this.wrap, buildLookRig(look));
     const svg = this.wrap.querySelector('svg') as SVGSVGElement;
 
     const c = look.colors;
@@ -77,6 +77,7 @@ export class PetView {
       'c-accent': this.accent,
     });
     this.player.setFlip(this.dir);
+    this.player.setBodyScale(BODY_SCALE[look.body] ?? 1);
 
     this.particles = new ParticleField(svg);
     this.lights = new LightEffectField(svg, svg.querySelector('[data-flip-root]'));
