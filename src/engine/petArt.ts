@@ -98,29 +98,39 @@ interface Spec {
   bigBelly?: boolean;
   spikes?: boolean;
   wingPatch?: boolean;
+  /** 腿长/腿型:决定站姿/坐姿轮廓中腿部的长短粗细,是物种辨识度的关键差异源 */
+  legMode?: 'stubby' | 'normal' | 'long' | 'flipper';
+  /** 头与身体是否融合无颈(仓鼠/猫头鹰式圆滚滚),false = 正常有脖颈过渡 */
+  neckFuse?: boolean;
+  /** 身体圆润度修正:>0 更圆(仓鼠/熊猫/猫头鹰),<0 更修长(狐狸/蝙蝠/龙) */
+  bodyRound?: number;
+  /** 翅膀是否作为主轮廓的一部分放大(蝙蝠),而非纯装饰贴花 */
+  wingBig?: boolean;
+  /** 龟壳式扁平宽体轮廓 */
+  flatWide?: boolean;
 }
 
 const SPEC: Record<string, Spec> = {
-  sp_cat:      { bw: 0, bh: 0, hr: 0, kind: 'quad' },
-  sp_dog:      { bw: 1, bh: 0, hr: 0, kind: 'quad', muzzle: true },
-  sp_rabbit:   { bw: -1, bh: 1, hr: 0, kind: 'quad' },
-  sp_fox:      { bw: 0, bh: 0, hr: 0, kind: 'quad', muzzle: true },
-  sp_hamster:  { bw: 2, bh: -1, hr: 1, kind: 'quad' },
+  sp_cat:      { bw: 0, bh: 0, hr: 0, kind: 'quad', legMode: 'normal', bodyRound: -1 },
+  sp_dog:      { bw: 1, bh: 0, hr: 0, kind: 'quad', muzzle: true, legMode: 'normal', bodyRound: 0 },
+  sp_rabbit:   { bw: -1, bh: 1, hr: 0, kind: 'quad', legMode: 'normal', bodyRound: 1 },
+  sp_fox:      { bw: 0, bh: 0, hr: 0, kind: 'quad', muzzle: true, legMode: 'normal', bodyRound: -1 },
+  sp_hamster:  { bw: 2, bh: -1, hr: 1, kind: 'quad', legMode: 'stubby', neckFuse: true, bodyRound: 2 },
   sp_bird:     { bw: -1, bh: 0, hr: 0, kind: 'bird', beak: true, wingPatch: true },
-  sp_duck:     { bw: 0, bh: 0, hr: 0, kind: 'bird', flatBeak: true, wingPatch: true },
-  sp_hedgehog: { bw: 1, bh: -1, hr: 0, kind: 'quad', spines: true },
-  sp_panda:    { bw: 2, bh: 0, hr: 1, kind: 'quad', mask: true },
-  sp_penguin:  { bw: 0, bh: 2, hr: 0, kind: 'bird', beak: true, bigBelly: true },
-  sp_turtle:   { bw: 2, bh: -1, hr: -1, kind: 'quad', shell: true },
-  sp_owl:      { bw: 0, bh: 1, hr: 1, kind: 'bird', beak: true, eyeRings: true, wingPatch: true },
-  sp_deer:     { bw: -1, bh: 1, hr: 0, kind: 'quad', antlers: true, muzzle: true },
+  sp_duck:     { bw: 0, bh: 0, hr: 0, kind: 'bird', flatBeak: true, wingPatch: true, bodyRound: 1 },
+  sp_hedgehog: { bw: 1, bh: -1, hr: 0, kind: 'quad', spines: true, legMode: 'stubby', bodyRound: 1 },
+  sp_panda:    { bw: 2, bh: 0, hr: 1, kind: 'quad', mask: true, legMode: 'stubby', bodyRound: 2 },
+  sp_penguin:  { bw: 0, bh: 2, hr: 0, kind: 'bird', beak: true, bigBelly: true, legMode: 'flipper', bodyRound: 1 },
+  sp_turtle:   { bw: 2, bh: -1, hr: -1, kind: 'quad', shell: true, legMode: 'stubby', flatWide: true, neckFuse: true },
+  sp_owl:      { bw: 0, bh: 1, hr: 1, kind: 'bird', beak: true, eyeRings: true, wingPatch: true, neckFuse: true, bodyRound: 2 },
+  sp_deer:     { bw: -1, bh: 1, hr: 0, kind: 'quad', antlers: true, muzzle: true, legMode: 'long', bodyRound: -1 },
   sp_slime:    { bw: 0, bh: 0, hr: 0, kind: 'blob' },
   sp_octopus:  { bw: 0, bh: 0, hr: 0, kind: 'blob', tentacles: true },
-  sp_bat:      { bw: -1, bh: 0, hr: 1, kind: 'quad', batWings: true },
-  sp_dragon:   { bw: 1, bh: 0, hr: 0, kind: 'quad', spikes: true },
+  sp_bat:      { bw: -1, bh: 0, hr: 1, kind: 'quad', batWings: true, wingBig: true, legMode: 'stubby', bodyRound: -1 },
+  sp_dragon:   { bw: 1, bh: 0, hr: 0, kind: 'quad', spikes: true, legMode: 'normal', bodyRound: -2 },
   sp_ghost:    { bw: 0, bh: 1, hr: 0, kind: 'blob', floaty: true },
-  sp_unicorn:  { bw: 0, bh: 1, hr: 0, kind: 'quad', horn: true, muzzle: true },
-  sp_phoenix:  { bw: -1, bh: 0, hr: 0, kind: 'bird', beak: true, crest: true, wingPatch: true },
+  sp_unicorn:  { bw: 0, bh: 1, hr: 0, kind: 'quad', horn: true, muzzle: true, legMode: 'long', bodyRound: -1 },
+  sp_phoenix:  { bw: -1, bh: 0, hr: 0, kind: 'bird', beak: true, crest: true, wingPatch: true, bodyRound: -1 },
 };
 
 function specOf(look: Look): Spec {
@@ -314,43 +324,64 @@ function buildSilhouette(m: Mask, look: Look, p: FP): { a: Anchors; tailPts: Arr
   }
 
   const isBird = spec.kind === 'bird';
+  const legMode = spec.legMode ?? 'normal';
+  const br = spec.bodyRound ?? 0;
+  const fused = !!spec.neckFuse;
 
   switch (p.pose) {
     case 'stand': {
-      const hx = 32 + hdx;
-      const hy = 19 + b + hdy;
-      m.ellipse(21, 33 + b, 11 + bw, 7 + bh + q);
-      if (spec.batWings) m.tri(7, 24 + b, 17, 21 + b, 17, 34 + b);
+      const flat = !!spec.flatWide;
+      const rx = flat ? 14 + bw : Math.max(6, 11 + bw + br * 1.3);
+      const ry = flat ? 5 : Math.max(4, 7 + bh + q - br * 1.5);
+      const bodyCy = 33 + b - (flat ? 2 : 0);
+      const hx = 32 + hdx - (fused ? 3 : 0);
+      const hy = (fused ? bodyCy - ry + 2 : 19) + b + hdy;
+      m.ellipse(21, bodyCy, rx, ry);
+      if (spec.wingBig) m.tri(3, 20 + b, 19, 16 + b, 19, 35 + b);
+      else if (spec.batWings) m.tri(7, 24 + b, 17, 21 + b, 17, 34 + b);
       if (isBird) {
         m.rect(18, 38 + b, 2, 45 - (38 + b) + 1);
         m.rect(26, 38 + b, 2, 45 - (38 + b) + 1);
+      } else if (legMode === 'stubby') {
+        // 极短腿(仓鼠/熊猫/龟/刺猬/蝙蝠):近乎贴地的小脚垫
+        const legX = [13, 18, 25, 30];
+        for (const lx of legX) m.rect(lx, 41 + b, 3, 4);
+      } else if (legMode === 'long') {
+        // 长腿(鹿/独角兽):腿部更高更细,站姿显著更"高挑"
+        const lifts = [
+          [2, 0, 0, 2], [1, 0, 0, 1], [0, 0, 0, 0], [0, 1, 1, 0],
+          [0, 2, 2, 0], [0, 1, 1, 0], [0, 0, 0, 0], [1, 0, 0, 1],
+        ][(p.legPhase ?? 1) % 8];
+        const legX = [11, 17, 26, 32];
+        for (let i = 0; i < 4; i++) m.rect(legX[i], 30 + b, 2, 45 - (30 + b) - lifts[i] + 1);
       } else {
         // 8 相步态(含半抬腿过渡帧),行走更连贯
         const lifts = [
-          [2, 0, 0, 2],
-          [1, 0, 0, 1],
-          [0, 0, 0, 0],
-          [0, 1, 1, 0],
-          [0, 2, 2, 0],
-          [0, 1, 1, 0],
-          [0, 0, 0, 0],
-          [1, 0, 0, 1],
+          [2, 0, 0, 2], [1, 0, 0, 1], [0, 0, 0, 0], [0, 1, 1, 0],
+          [0, 2, 2, 0], [0, 1, 1, 0], [0, 0, 0, 0], [1, 0, 0, 1],
         ][(p.legPhase ?? 1) % 8];
         const legX = [12, 17, 26, 31];
         for (let i = 0; i < 4; i++) m.rect(legX[i], 36 + b, 3, 45 - (36 + b) - lifts[i] + 1);
       }
       m.circle(hx, hy, hr);
       addEars(m, look, hx, hy, hr, !!p.earFlat);
-      tailPts = addTail(m, look, [11 - bw, 30 + b], t, p.pose);
-      return { a: { hx, hy, hr, face: true, nx: hx - 3, ny: hy + hr - 2, bodyCx: 21, bodyCy: 33 + b }, tailPts };
+      tailPts = addTail(m, look, [21 - rx, bodyCy - 3], t, p.pose);
+      return { a: { hx, hy, hr, face: true, nx: hx - 3, ny: hy + hr - 2, bodyCx: 21, bodyCy }, tailPts };
     }
     case 'sit': {
-      const hx = 26 + hdx;
-      const hy = 16 + b + hdy;
-      m.ellipse(21, 33 + b, 9 + bw, 11 + bh + q);
-      m.circle(15, 38, 6 + bw / 2);
-      if (spec.batWings) m.tri(8, 26 + b, 16, 22 + b, 16, 36 + b);
-      m.rect(24, 34 + b, 3, 45 - (34 + b) + 1);
+      const flat = !!spec.flatWide;
+      const rx = flat ? 13 + bw : Math.max(5, 9 + bw + br * 1.0);
+      const ry = flat ? 7 : Math.max(6, 11 + bh + q - br * 1.2);
+      const bodyCy = 33 + b;
+      const hx = 26 + hdx - (fused ? 3 : 0);
+      const hy = (fused ? bodyCy - ry + 3 : 16) + b + hdy;
+      m.ellipse(21, bodyCy, rx, ry);
+      m.circle(15, bodyCy + 5, (legMode === 'stubby' ? 4 : 6) + bw / 2);
+      if (spec.wingBig) m.tri(5, 22 + b, 15, 18 + b, 15, 37 + b);
+      else if (spec.batWings) m.tri(8, 26 + b, 16, 22 + b, 16, 36 + b);
+      const frontLegW = legMode === 'long' ? 2 : 3;
+      const frontLegTop = legMode === 'stubby' ? 39 + b : legMode === 'long' ? 27 + b : 34 + b;
+      m.rect(24, frontLegTop, frontLegW, 45 - frontLegTop + 1);
       if (p.pawUp) {
         m.circle(31, 30 + (p.pawY ?? 0), 3);
         m.rect(27, 33, 4, 3);
@@ -358,79 +389,98 @@ function buildSilhouette(m: Mask, look: Look, p: FP): { a: Anchors; tailPts: Arr
         m.circle(29, 24 + (p.lickY ?? 0), 3);
         m.rect(27, 27, 3, 6);
       } else {
-        m.rect(28, 34 + b, 3, 45 - (34 + b) + 1);
+        m.rect(28, frontLegTop, frontLegW, 45 - frontLegTop + 1);
       }
       m.circle(hx, hy, hr);
       addEars(m, look, hx, hy, hr, !!p.earFlat);
-      tailPts = addTail(m, look, [13, 43], t, p.pose);
-      return { a: { hx, hy, hr, face: true, nx: hx - 1, ny: hy + hr - 1, bodyCx: 21, bodyCy: 33 + b }, tailPts };
+      tailPts = addTail(m, look, [21 - rx + 2, bodyCy + ry - 2], t, p.pose);
+      return { a: { hx, hy, hr, face: true, nx: hx - 1, ny: hy + hr - 1, bodyCx: 21, bodyCy }, tailPts };
     }
     case 'lie': {
-      const hx = 31 + hdx;
-      const hy = 28 + b + hdy;
-      m.ellipse(21, 37, 13 + bw, 6 + bh + q);
+      const flat = !!spec.flatWide;
+      const rx = flat ? 15 + bw : Math.max(7, 13 + bw + br * 0.7);
+      const ry = flat ? 4 : Math.max(3, 6 + bh + q - br * 0.6);
+      const bodyCy = 37;
+      const hx = 31 + hdx - (fused ? 4 : 0);
+      const hy = (fused ? bodyCy - ry + b : 28 + b) + hdy;
+      m.ellipse(21, bodyCy, rx, ry);
       m.circle(hx, hy, hr - 1);
       addEars(m, look, hx, hy, hr - 1, !!p.earFlat);
       m.rect(32, 41, 3, 3);
       m.rect(36, 41, 3, 3);
-      tailPts = addTail(m, look, [8 - bw, 39], t, p.pose);
-      return { a: { hx, hy, hr: hr - 1, face: true, nx: hx - 3, ny: hy + hr - 3, bodyCx: 21, bodyCy: 37 }, tailPts };
+      tailPts = addTail(m, look, [21 - rx + 5, bodyCy + 2], t, p.pose);
+      return { a: { hx, hy, hr: hr - 1, face: true, nx: hx - 3, ny: hy + hr - 3, bodyCx: 21, bodyCy }, tailPts };
     }
     case 'curl': {
-      const hx = 29 + hdx;
+      const r = Math.max(7, 11 + bw + q * 0.5 + br * 0.5);
+      const hx = 29 + hdx - (fused ? 2 : 0);
       const hy = 31 + b + hdy;
-      m.circle(23, 36, 11 + bw + q * 0.5);
+      m.circle(23, 36, r);
       m.circle(hx, hy, hr - 2);
       addEars(m, look, hx, hy, hr - 2, true);
       tailPts = addTail(m, look, [34, 42], 0.2, p.pose);
       return { a: { hx, hy, hr: hr - 2, face: true, nx: hx, ny: hy + hr - 3, bodyCx: 23, bodyCy: 36 }, tailPts };
     }
     case 'back': {
+      const flat = !!spec.flatWide;
+      const rx = flat ? 12 + bw : Math.max(6, 9 + bw + br * 1.0);
+      const ry = flat ? 6 : Math.max(5, 10 + bh + q - br * 1.1);
+      const bodyCy = 34;
       const hx = 24 + hdx;
-      const hy = 16 + b + hdy;
-      m.ellipse(24, 34, 9 + bw, 10 + bh + q);
-      m.circle(17, 39, 5);
-      m.circle(31, 39, 5);
+      const hy = (fused ? bodyCy - ry + 2 : 16) + b + hdy;
+      const haunchY = bodyCy + ry * 0.5;
+      const haunchR = legMode === 'stubby' ? 3.5 : 5;
+      m.ellipse(24, bodyCy, rx, ry);
+      m.circle(24 - rx + 2, haunchY, haunchR);
+      m.circle(24 + rx - 2, haunchY, haunchR);
       m.circle(hx, hy, hr);
       addEars(m, look, hx, hy, hr, false);
-      tailPts = addTail(m, look, [28, 43], t, p.pose);
-      return { a: { hx, hy, hr, face: false, nx: hx, ny: hy + hr - 1, bodyCx: 24, bodyCy: 34 }, tailPts };
+      tailPts = addTail(m, look, [24 + rx - 4, haunchY + 3], t, p.pose);
+      return { a: { hx, hy, hr, face: false, nx: hx, ny: hy + hr - 1, bodyCx: 24, bodyCy }, tailPts };
     }
     case 'hang': {
+      const rx = Math.max(5, 8 + bw + br * 0.6);
+      const ry = Math.max(6, 11 + bh - br * 0.6);
+      const bodyCy = 31;
       const hx = 24 + hdx;
-      const hy = 13 + hdy;
-      m.ellipse(24, 31, 8 + bw, 11 + bh);
+      const hy = (fused ? bodyCy - ry + 3 : 13) + hdy;
+      m.ellipse(24, bodyCy, rx, ry);
+      const legLen = legMode === 'stubby' ? 3 : legMode === 'long' ? 7 : 5;
       const legX = [17, 21, 27, 31];
       for (let i = 0; i < 4; i++) {
         const dy = (phase + i) % 2 === 0 ? 0 : 2;
-        m.rect(legX[i], 40 + dy, 2, 5);
+        m.rect(legX[i], 40 + dy, 2, legLen);
       }
       m.circle(hx, hy, hr);
       addEars(m, look, hx, hy, hr, true);
-      tailPts = addTail(m, look, [14 - bw, 36], t, p.pose);
-      return { a: { hx, hy, hr, face: true, nx: hx, ny: hy + hr - 1, bodyCx: 24, bodyCy: 31 }, tailPts };
+      tailPts = addTail(m, look, [24 - rx + 2, bodyCy + 5], t, p.pose);
+      return { a: { hx, hy, hr, face: true, nx: hx, ny: hy + hr - 1, bodyCx: 24, bodyCy }, tailPts };
     }
     case 'jump': {
+      const rx = Math.max(5, 8 + bw + br * 0.6);
+      const ry = Math.max(6, 10 + bh - br * 0.6);
+      const bodyCy = 30 + b;
       const hx = 24 + hdx;
-      const hy = 14 + b + hdy;
-      m.ellipse(24, 30 + b, 8 + bw, 10 + bh);
+      const hy = (fused ? bodyCy - ry + 3 : 14 + b) + hdy;
+      m.ellipse(24, bodyCy, rx, ry);
       m.rect(18, 38 + b, 4, 3);
       m.rect(26, 38 + b, 4, 3);
       m.circle(hx, hy, hr - 1);
       addEars(m, look, hx, hy, hr - 1, true);
-      tailPts = addTail(m, look, [14, 34], t, p.pose);
-      return { a: { hx, hy, hr: hr - 1, face: true, nx: hx, ny: hy + hr - 2, bodyCx: 24, bodyCy: 30 + b }, tailPts };
+      tailPts = addTail(m, look, [24 - rx + 2, bodyCy + 3], t, p.pose);
+      return { a: { hx, hy, hr: hr - 1, face: true, nx: hx, ny: hy + hr - 2, bodyCx: 24, bodyCy }, tailPts };
     }
     case 'stretch': {
+      const legLen = legMode === 'stubby' ? 5 : legMode === 'long' ? 11 : 8;
       const hx = 33 + hdx;
       const hy = 33 + b + hdy;
-      m.circle(14, 31, 7 + bw / 2);
-      m.ellipse(18, 33, 8 + bw, 5);
-      m.ellipse(22, 36, 10 + bw, 5);
+      m.circle(14, 31, Math.max(5, 7 + bw / 2 + br * 0.3));
+      m.ellipse(18, 33, Math.max(5, 8 + bw + br * 0.4), 5);
+      m.ellipse(22, 36, Math.max(6, 10 + bw + br * 0.4), 5);
       m.circle(hx, hy, hr - 2);
       addEars(m, look, hx, hy, hr - 2, !!p.earFlat);
-      m.rect(36, 38, 3, 8);
-      m.rect(40, 38, 3, 8);
+      m.rect(36, 46 - legLen, 3, legLen);
+      m.rect(40, 46 - legLen, 3, legLen);
       tailPts = addTail(m, look, [9, 26], t + 0.3, p.pose);
       return { a: { hx, hy, hr: hr - 2, face: true, nx: hx - 2, ny: hy + hr - 3, bodyCx: 20, bodyCy: 34 }, tailPts };
     }

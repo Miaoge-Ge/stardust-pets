@@ -34,12 +34,12 @@
     { "id": "mat_scales",   "dimension": "material", "name": "鳞片微光", "minRarity": "SR", "excludes": { "species": ["sp_slime", "sp_octopus", "sp_ghost"] } },
     { "id": "mat_stardust", "dimension": "material", "name": "星尘颗粒", "minRarity": "SSR", "excludes": { "species": ["sp_slime", "sp_octopus", "sp_ghost"] } },
 
-    { "id": "ears_up",     "dimension": "ears", "name": "立耳",   "minRarity": "N" },
-    { "id": "ears_flop",   "dimension": "ears", "name": "垂耳",   "minRarity": "N" },
-    { "id": "ears_fold",   "dimension": "ears", "name": "折耳",   "minRarity": "N" },
-    { "id": "ears_rabbit", "dimension": "ears", "name": "长耳",   "minRarity": "N" },
-    { "id": "ears_round",  "dimension": "ears", "name": "圆耳",   "minRarity": "N" },
-    { "id": "ears_sharp",  "dimension": "ears", "name": "尖耳",   "minRarity": "N" },
+    { "id": "ears_up",     "dimension": "ears", "name": "立耳",   "minRarity": "N", "excludes": { "species": ["sp_slime", "sp_octopus", "sp_ghost"] } },
+    { "id": "ears_flop",   "dimension": "ears", "name": "垂耳",   "minRarity": "N", "excludes": { "species": ["sp_slime", "sp_octopus", "sp_ghost"] } },
+    { "id": "ears_fold",   "dimension": "ears", "name": "折耳",   "minRarity": "N", "excludes": { "species": ["sp_slime", "sp_octopus", "sp_ghost"] } },
+    { "id": "ears_rabbit", "dimension": "ears", "name": "长耳",   "minRarity": "N", "excludes": { "species": ["sp_slime", "sp_octopus", "sp_ghost"] } },
+    { "id": "ears_round",  "dimension": "ears", "name": "圆耳",   "minRarity": "N", "excludes": { "species": ["sp_slime", "sp_octopus", "sp_ghost"] } },
+    { "id": "ears_sharp",  "dimension": "ears", "name": "尖耳",   "minRarity": "N", "excludes": { "species": ["sp_slime", "sp_octopus", "sp_ghost"] } },
     { "id": "ears_none",   "dimension": "ears", "name": "无耳",   "minRarity": "SR", "requires": { "species": ["sp_slime", "sp_octopus", "sp_ghost"] } },
     { "id": "ears_horn",   "dimension": "ears", "name": "龙角",   "minRarity": "SSR", "requires": { "species": ["sp_dragon"] } },
 
